@@ -1,8 +1,12 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <getopt.h>
-#include <server.c>
+#include <pthread.h>
+#include <unistd.h>
+#include "udp_helper.h"
+#include "msg.h"
 
-char *TOKEN;
+extern char *TOKEN;
 
 int main(int argc, char *argv[])
 {
@@ -24,7 +28,13 @@ int main(int argc, char *argv[])
         }
     }
 
+    udp_init();
+    udp_server_init();
+    udp_boardcast();
 
+    printf("init done...\n");
+
+    sleep(10);
 
     return 0;
 }

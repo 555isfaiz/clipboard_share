@@ -1,1 +1,5 @@
 .vscode
+*.o
+test.c
+test
+main
