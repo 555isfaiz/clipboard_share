@@ -2,7 +2,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <ifaddrs.h>
 #include <unistd.h>
 #include <pthread.h>
 #include "msg.h"
@@ -43,37 +42,18 @@ void udp_boardcast()
 		return;
 	}
 
-	struct ifaddrs *ifaddr, *ifa;
-
-	if (getifaddrs(&ifaddr) == -1)
-	{
-		perror("getifaddrs");
-		return;
-	}
-
 	char buf[1024] = {0};
 	int len = get_msg_online(buf);
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+	addr.sin_port = htons(SERVER_PORT);
+	ret = udp_send_as_client(addr, buf, len);
+	if (ret < 0)
 	{
-		if (ifa->ifa_addr == NULL)
-			continue;
-
-		if (ifa->ifa_addr->sa_family == AF_INET)
-		{
-			struct sockaddr_in addr;
-			addr.sin_family = AF_INET;
-			addr.sin_addr = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-			addr.sin_port = htons(SERVER_PORT);
-			int ret = udp_send_as_client(addr, buf, len);
-			if (ret < 0) 
-			{
-				perror("udp broadcast send error");
-				return;
-			}
-		}
+		perror("udp broadcast send error");
+		return;
 	}
-
-	freeifaddrs(ifaddr);
 
 	int off = 0;
 	ret = setsockopt(udp_client_socket, SOL_SOCKET, SO_BROADCAST, &off, sizeof(off));
