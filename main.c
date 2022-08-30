@@ -14,25 +14,31 @@
 #include "mac.h"
 #endif
 
-extern char *TOKEN;
+extern int SERVER_PORT;
 
 void print_usage(char *proc)
 {
     printf("usage: %s [OPTS]\n"
                    "options:\n"
                    " -h      print this help.\n"
-                   " -t      set the token for clipboard_share and run.\n",
+                   " -t      set the token for clipboard_share and run.\n"
+                   " -p      set the port for udp server.\n",
                    proc);
 }
 
 int main(int argc, char *argv[])
 {
     int opt, has_token = 0, ret;
-    while ((opt = getopt(argc, argv, "ht:")) != -1) {
+    while ((opt = getopt(argc, argv, "ht:p:")) != -1) {
         switch(opt) {
         case 't':
             has_token = 1;
             set_token(optarg);
+            break;
+
+        case 'p':
+            has_token = 1;
+            SERVER_PORT = atoi(optarg);
             break;
 
         case 'h':
