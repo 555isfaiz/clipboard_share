@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
 #include "msg.h"
 #include "udp_helper.h"
 
@@ -32,7 +34,7 @@ int udp_init()
 	return 0;
 }
 
-void udp_boardcast()
+void udp_broadcast()
 {
 	int on=1;
 	int ret = setsockopt(udp_client_socket, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
@@ -77,22 +79,44 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 
 void *server_loop()
 {
-	char buffer[128]={0};
+	char buffer[128] = {0};
 	struct sockaddr_in sendaddr;
 	socklen_t len = sizeof(sendaddr);
 
+	struct ifaddrs *ifaddr, *ifa;
+
+	if (getifaddrs(&ifaddr) == -1)
+	{
+		perror("getifaddrs");
+		return (void *)0;
+	}
+
 	while (1)
 	{
+		lo_start:
 		int ret  = recvfrom(udp_server_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&sendaddr, &len);
 		if(ret < 0)
 		{
 			perror("recvfrom error");
 			break;
 		}
-		printf(buffer);
+
+		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+		{
+			if (ifa->ifa_addr == NULL)
+				continue;
+
+			if (ifa->ifa_addr->sa_family == AF_INET && (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == sendaddr.sin_addr.s_addr))
+				goto lo_start;
+		}
+
+		char buf[128] = {0};
+		inet_ntop(AF_INET, &(sendaddr.sin_addr), buf, 128);
+		printf("addr: %s", buf);
 		printf("\n");
 	}
 
+   	freeifaddrs(ifaddr);
 	return (void*)0;
 }
 

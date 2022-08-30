@@ -5,7 +5,7 @@
 
 int udp_init();
 
-void udp_boardcast();
+void udp_broadcast();
 
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size);
 

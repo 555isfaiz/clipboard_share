@@ -8,10 +8,20 @@
 
 extern char *TOKEN;
 
+void print_usage(char *proc)
+{
+    printf("usage: %s [OPTS]\n"
+                   "options:\n"
+                   " -h      print this help.\n"
+                   " -t      set the token for clipboard_share and run.\n",
+                   proc);
+}
+
 int main(int argc, char *argv[])
 {
-    int opt;
+    int opt, has_arg = 0;
     while ((opt = getopt(argc, argv, "ht:")) != -1) {
+        has_arg = 1;
         switch(opt) {
         case 't':
             TOKEN = optarg;
@@ -19,18 +29,25 @@ int main(int argc, char *argv[])
 
         case 'h':
         default:
-            printf("usage: %s [OPTS] [FILE]\n"
-                   "options:\n"
-                   " -h      print this help.\n"
-                   " -t      set the token for clipboard_share and run.\n",
-                   argv[0]);
-            return EXIT_SUCCESS;
+            print_usage(argv[0]);
+            return 0;
         }
     }
 
+    if (!has_arg) 
+    {
+        print_usage(argv[0]);
+        return 0;
+    }
+
+    printf("init udp server... ");
     udp_init();
     udp_server_init();
-    udp_boardcast();
+    printf("ok\n");
+
+    printf("doing udp broadcast... ");
+    udp_broadcast();
+    printf("ok\n");
 
     printf("init done...\n");
 
