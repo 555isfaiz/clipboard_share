@@ -108,7 +108,6 @@ void udp_broadcast_to_known(char *buf, int len)
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 {
 	int ret, send_num = 0;
-	printf("sending %d, %d\n", ret, size);
 	while (send_num < size)
 	{
 		ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
@@ -148,7 +147,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 
 	// msg clipboard update: update local clipboard with content from other device
 	buf_len = gen_msg_clipboard_update(buffer);
-	if (strncmp(buf, buffer, len) == 0)
+	if (strncmp(buf, buffer, buf_len) == 0)
 	{
 		printf("clipboard update: %s\n", buf + buf_len);
 	}

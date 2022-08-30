@@ -82,7 +82,7 @@ void clipboard_monitor_loop()
                         char send_buf[8192] = {0};
                         int msg_len = gen_msg_clipboard_update(send_buf);
                         memcpy(send_buf + msg_len, cb_buf, cb_len);
-                        udp_broadcast_to_known(send_buf, msg_len);
+                        udp_broadcast_to_known(send_buf, msg_len + cb_len);
                     }
                 }
             }
