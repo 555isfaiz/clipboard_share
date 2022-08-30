@@ -30,9 +30,16 @@ void set_token(char *str)
     memcpy(TOKEN, buf, n);
 }
 
-int get_msg_online(char *buf)
+int gen_msg_online(char *buf)
 {
     strncpy(buf, TOKEN, TOKEN_LEN);
     strcpy(buf + TOKEN_LEN, "o");
+    return TOKEN_LEN + 1;
+}
+
+int gen_msg_clipboard_update(char *buf)
+{
+    strncpy(buf, TOKEN, TOKEN_LEN);
+    strcpy(buf + TOKEN_LEN, "c");
     return TOKEN_LEN + 1;
 }

@@ -11,8 +11,15 @@
 #include "msg.h"
 #include "udp_helper.h"
 
+#ifdef _WIN32
+// TODO
+#elif __linux__
+#include "linux.h"
+#elif __APPLE__
+#include "mac.h"
+#endif
+
 int SERVER_PORT = 8888;
-int CLIENT_PORT = 9999;
 
 int udp_client_socket = 0;
 int udp_server_socket = 0;
@@ -32,7 +39,21 @@ void add_to_addr_list(struct sockaddr_in *addr)
 		addr_list = ptr;
 	}
 
-	memcpy(addr_list + ++addr_list_ptr, addr, sizeof(struct sockaddr_in));
+	memcpy(addr_list + addr_list_ptr++, addr, sizeof(struct sockaddr_in));
+	addr_list[addr_list_ptr - 1].sin_port = htons(SERVER_PORT);
+}
+
+void remove_from_addr_list(struct sockaddr_in addr)
+{
+	for (int i = 0; i < addr_list_ptr; i++)
+	{
+		if (addr_list[i].sin_addr.s_addr == addr.sin_addr.s_addr)
+		{
+			memcpy(&addr_list[i], &addr_list[i + 1], (addr_list_ptr - i - 1) * sizeof(struct sockaddr_in));
+			addr_list_ptr--;
+			break;
+		}
+	}
 }
 
 int udp_init()
@@ -43,15 +64,6 @@ int udp_init()
 		perror("create client socket failed\n");
 		return udp_client_socket;
 	}
-
-	udp_server_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	if(0 > udp_server_socket)
-	{
-		perror("create server socket failed\n");
-		return udp_server_socket;
-	}
-
-	addr_list = calloc(addr_list_size, sizeof(struct sockaddr_in));
 
 	return 0;
 }
@@ -67,7 +79,7 @@ void udp_broadcast()
 	}
 
 	char buf[128] = {0};
-	int len = get_msg_online(buf);
+	int len = gen_msg_online(buf);
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
@@ -83,6 +95,16 @@ void udp_broadcast()
 	ret = setsockopt(udp_client_socket, SOL_SOCKET, SO_BROADCAST, &off, sizeof(off));
 }
 
+void udp_broadcast_to_known(char *buf, int len)
+{
+	for (int i = 0; i < addr_list_ptr; i++)
+	{
+		int ret = udp_send_as_client(addr_list[i], buf, len);
+		if (ret < 0)
+			i--;		// error happened, this addr has been removed
+	}
+}
+
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 {
 	int ret, send_num = 0;
@@ -91,6 +113,7 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 		ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
 		if (ret < 0)
 		{
+			remove_from_addr_list(addr);
 			perror("udp client send error:");
 			return ret;
 		}
@@ -99,13 +122,25 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 	return 0;
 }
 
-void handle_datagram(char *buf, int len)
+void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 {
 	char buffer[32] = {0};
-	get_msg_online(buffer);
-	if (strncmp(buf, buffer, len))
+
+	// msg online: other device is online
+	int buf_len = gen_msg_online(buffer);
+	if (strncmp(buf, buffer, len) == 0)
 	{
-		printf("online msg!\n");
+		add_to_addr_list(&from_addr);
+		from_addr.sin_port = htons(SERVER_PORT);
+		udp_send_as_client(from_addr, buffer, buf_len);
+		return;
+	}
+
+	// msg clipboard update: update local clipboard with content from other device
+	buf_len = gen_msg_clipboard_update(buffer);
+	if (strncmp(buf, buffer, len) == 0)
+	{
+		printf("clipboard update: %s\n", buf + buf_len);
 	}
 }
 
@@ -145,11 +180,7 @@ void *server_loop()
 			}
 		}
 
-		handle_datagram(buffer, ret);
-		// char buf[128] = {0};
-		// inet_ntop(AF_INET, &(sendaddr.sin_addr), buf, 128);
-		// printf("addr: %s", buf);
-		// printf("\n");
+		handle_datagram(buffer, ret, sendaddr);
 	}
 
    	freeifaddrs(ifaddr);
@@ -158,6 +189,16 @@ void *server_loop()
 
 int udp_server_init()
 {
+	// init addr list
+	addr_list = calloc(addr_list_size, sizeof(struct sockaddr_in));
+
+	udp_server_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(0 > udp_server_socket)
+	{
+		perror("create server socket failed\n");
+		return udp_server_socket;
+	}
+
 	// bind socket
 	struct sockaddr_in addr_serv;
 	addr_serv.sin_family = AF_INET;

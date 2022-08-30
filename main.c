@@ -6,6 +6,14 @@
 #include "udp_helper.h"
 #include "msg.h"
 
+#ifdef _WIN32
+// TODO
+#elif __linux__
+#include "linux.h"
+#elif __APPLE__
+#include "mac.h"
+#endif
+
 extern char *TOKEN;
 
 void print_usage(char *proc)
@@ -19,7 +27,7 @@ void print_usage(char *proc)
 
 int main(int argc, char *argv[])
 {
-    int opt, has_token = 0;
+    int opt, has_token = 0, ret;
     while ((opt = getopt(argc, argv, "ht:")) != -1) {
         switch(opt) {
         case 't':
@@ -42,17 +50,18 @@ int main(int argc, char *argv[])
     }
 
     printf("init udp server... ");
-    udp_init();
-    udp_server_init();
+    ret = udp_init();
+    if (ret < 0) return ret;
+    ret = udp_server_init();
+    if (ret < 0) return ret;
     printf("ok\n");
 
     printf("doing udp broadcast... ");
     udp_broadcast();
     printf("ok\n");
 
+    clipboard_monitor_loop();
+
     printf("init done...\n");
-
-    sleep(10);
-
     return 0;
 }

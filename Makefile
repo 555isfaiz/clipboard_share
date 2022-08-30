@@ -1,5 +1,18 @@
-SOURCES = main.c  msg.c  udp_helper.c
-HEADERS = msg.h  udp_helper.h
+PLATFORM_SOURCES =  
+PLATFORM_HEADERS = 
+
+UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+        PLATFORM_SOURCES += linux.c
+		PLATFORM_HEADERS += linux.h
+    endif
+    ifeq ($(UNAME_S),Darwin)
+        PLATFORM_SOURCES += mac.c
+		PLATFORM_HEADERS += mac.h
+    endif
+
+SOURCES = main.c  msg.c  udp_helper.c  $(PLATFORM_SOURCES)
+HEADERS = msg.h  udp_helper.h  $(PLATFORM_HEADERS)
 
 ver = debug
  
