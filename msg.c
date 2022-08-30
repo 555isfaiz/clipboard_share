@@ -4,6 +4,7 @@
 #include "msg.h"
 
 char *TOKEN;
+int TOKEN_LEN;
 
 /*
  * Hash function by
@@ -25,12 +26,13 @@ void set_token(char *str)
     char buf[32] = {0};
     int n = sprintf(buf, "%d", hash_c);
     TOKEN = calloc(n, sizeof(char));
+    TOKEN_LEN = n;
     memcpy(TOKEN, buf, n);
 }
 
 int get_msg_online(char *buf)
 {
-    strcpy(buf, TOKEN);
-    strcpy(buf + sizeof(TOKEN), "o");
-    return sizeof(TOKEN) + 1;
+    strncpy(buf, TOKEN, TOKEN_LEN);
+    strcpy(buf + TOKEN_LEN, "o");
+    return TOKEN_LEN + 1;
 }

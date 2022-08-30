@@ -66,7 +66,7 @@ void udp_broadcast()
 		return;
 	}
 
-	char buf[1024] = {0};
+	char buf[128] = {0};
 	int len = get_msg_online(buf);
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
