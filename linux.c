@@ -23,7 +23,8 @@ char* read_local_clipboard(int *len)
         while ((dup2(fds[1], STDOUT_FILENO) == -1) && (errno == EINTR)) {}
         close(fds[0]);
         close(fds[1]);
-        execvp("xsel", NULL);
+        char* argument_list[] = {"--clipboard", NULL};
+        execvp("xsel", argument_list);
         exit(1);
     }
     else
@@ -41,7 +42,25 @@ char* read_local_clipboard(int *len)
 
 void write_local_clipboard(char *buf, int len)
 {
-
+    int fds[2]; 
+    pipe(fds);
+    int pid = fork(), status = 0;
+    if (pid == 0)
+    {
+        while ((dup2(fds[0], STDIN_FILENO) == -1) && (errno == EINTR)) {}
+        close(fds[0]);
+        close(fds[1]);
+        char* argument_list[] = {"--input", "--clipboard", NULL};
+        execvp("xsel", argument_list);
+        exit(1);
+    }
+    else
+    {
+        close(fds[0]);
+        write(fds[1], buf, len);
+        close(fds[1]);
+        waitpid(pid, &status, 0);
+    }
 }
 
 void clipboard_monitor_loop()
@@ -83,6 +102,7 @@ void clipboard_monitor_loop()
                         int msg_len = gen_msg_clipboard_update(send_buf);
                         memcpy(send_buf + msg_len, cb_buf, cb_len);
                         udp_broadcast_to_known(send_buf, msg_len + cb_len);
+                        free(cb_buf);
                     }
                 }
             }

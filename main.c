@@ -60,8 +60,9 @@ int main(int argc, char *argv[])
     udp_broadcast();
     printf("ok\n");
 
-    clipboard_monitor_loop();
-
     printf("init done...\n");
+    printf("start monitor...\n");
+
+    clipboard_monitor_loop();
     return 0;
 }
