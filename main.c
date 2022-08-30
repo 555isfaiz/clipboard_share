@@ -19,12 +19,12 @@ void print_usage(char *proc)
 
 int main(int argc, char *argv[])
 {
-    int opt, has_arg = 0;
+    int opt, has_token = 0;
     while ((opt = getopt(argc, argv, "ht:")) != -1) {
-        has_arg = 1;
         switch(opt) {
         case 't':
-            TOKEN = optarg;
+            has_token = 1;
+            set_token(optarg);
             break;
 
         case 'h':
@@ -34,8 +34,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!has_arg) 
+    if (!has_token) 
     {
+        printf("No token set...");
         print_usage(argv[0]);
         return 0;
     }

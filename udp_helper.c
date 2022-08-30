@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
@@ -6,6 +7,7 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+#include <string.h>
 #include "msg.h"
 #include "udp_helper.h"
 
@@ -14,6 +16,24 @@ int CLIENT_PORT = 9999;
 
 int udp_client_socket = 0;
 int udp_server_socket = 0;
+
+struct sockaddr_in *addr_list;
+int addr_list_size = 8;
+int addr_list_ptr = 0;
+
+void add_to_addr_list(struct sockaddr_in *addr)
+{
+	if (addr_list_ptr + 1 == addr_list_size)
+	{
+		addr_list_size <<= 1;
+		struct sockaddr_in *ptr = calloc(addr_list_size, sizeof(struct sockaddr_in));
+		memcpy(ptr, addr_list, (addr_list_ptr + 1) * sizeof(struct sockaddr_in));
+		free(addr_list);
+		addr_list = ptr;
+	}
+
+	memcpy(addr_list + ++addr_list_ptr, addr, sizeof(struct sockaddr_in));
+}
 
 int udp_init()
 {
@@ -30,6 +50,8 @@ int udp_init()
 		perror("create server socket failed\n");
 		return udp_server_socket;
 	}
+
+	addr_list = calloc(addr_list_size, sizeof(struct sockaddr_in));
 
 	return 0;
 }
@@ -77,6 +99,16 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 	return 0;
 }
 
+void handle_datagram(char *buf, int len)
+{
+	char buffer[32] = {0};
+	get_msg_online(buffer);
+	if (strncmp(buf, buffer, len))
+	{
+		printf("online msg!\n");
+	}
+}
+
 void *server_loop()
 {
 	char buffer[128] = {0};
@@ -107,13 +139,17 @@ void *server_loop()
 				continue;
 
 			if (ifa->ifa_addr->sa_family == AF_INET && (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == sendaddr.sin_addr.s_addr))
+			{
+				printf("ignored self\n");
 				goto lo_start;
+			}
 		}
 
-		char buf[128] = {0};
-		inet_ntop(AF_INET, &(sendaddr.sin_addr), buf, 128);
-		printf("addr: %s", buf);
-		printf("\n");
+		handle_datagram(buffer, ret);
+		// char buf[128] = {0};
+		// inet_ntop(AF_INET, &(sendaddr.sin_addr), buf, 128);
+		// printf("addr: %s", buf);
+		// printf("\n");
 	}
 
    	freeifaddrs(ifaddr);
