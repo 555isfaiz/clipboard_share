@@ -101,13 +101,14 @@ void udp_broadcast_to_known(char *buf, int len)
 	{
 		int ret = udp_send_as_client(addr_list[i], buf, len);
 		if (ret < 0)
-			i--;		// error happened, this addr has been removed
+			break;		// error happened, this addr has been removed
 	}
 }
 
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 {
 	int ret, send_num = 0;
+	printf("sending %d, %d\n", ret, size);
 	while (send_num < size)
 	{
 		ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
@@ -132,7 +133,16 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 	{
 		add_to_addr_list(&from_addr);
 		from_addr.sin_port = htons(SERVER_PORT);
+		buf_len = gen_msg_ack_online(buffer);
 		udp_send_as_client(from_addr, buffer, buf_len);
+		return;
+	}
+
+	// msg ack online: record responded devices
+	buf_len = gen_msg_ack_online(buffer);
+	if (strncmp(buf, buffer, len) == 0)
+	{
+		add_to_addr_list(&from_addr);
 		return;
 	}
 
@@ -175,7 +185,6 @@ void *server_loop()
 
 			if (ifa->ifa_addr->sa_family == AF_INET && (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr == sendaddr.sin_addr.s_addr))
 			{
-				printf("ignored self\n");
 				goto lo_start;
 			}
 		}
