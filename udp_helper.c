@@ -93,7 +93,7 @@ void *server_loop()
 
 	while (1)
 	{
-		lo_start:
+		lo_start: ;
 		int ret  = recvfrom(udp_server_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&sendaddr, &len);
 		if(ret < 0)
 		{
