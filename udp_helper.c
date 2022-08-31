@@ -19,7 +19,7 @@
 #include "mac.h"
 #endif
 
-int SERVER_PORT = 8888;
+int SERVER_PORT = 53338;
 
 int udp_client_socket = 0;
 int udp_server_socket = 0;
@@ -139,8 +139,8 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 	int buf_len = gen_msg_online(buffer);
 	if (strncmp(buf, buffer, len) == 0)
 	{
-		add_to_addr_list(&from_addr);
 		from_addr.sin_port = htons(SERVER_PORT);
+		add_to_addr_list(&from_addr);
 		buf_len = gen_msg_ack_online(buffer);
 		udp_send_as_client(from_addr, buffer, buf_len);
 		return;
@@ -245,5 +245,7 @@ int udp_server_init()
 
 int udp_close()
 {
+	close(udp_client_socket);
+	close(udp_server_socket);
 	return 0;
 }

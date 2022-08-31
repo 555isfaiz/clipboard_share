@@ -31,10 +31,13 @@ LDFLAGS = -fsanitize=address -pthread -ldl $(MAC_FLAGS)
 
 .PHONY: main clean
 
-main: $(SOURCES:.c=.o)
+clipboardshare: $(SOURCES:.c=.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 $(SOURCES:.c=.o): $(HEADERS)
 
 clean:
 	rm -f main *.o
+
+install:
+	sudo cp clipboardshare /usr/bin/clipboardshare
