@@ -177,7 +177,6 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 	if (strncmp(buf, buffer, buf_len) == 0)
 	{
 		write_local_clipboard(buf + buf_len, len - buf_len);
-		printf("clipboard update: %s\n", buf + buf_len);
 	}
 }
 

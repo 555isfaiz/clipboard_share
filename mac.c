@@ -121,13 +121,13 @@ void clipboard_monitor_loop()
 		perror("PasteboardCreate() failed\n");
 		return;
 	}
+
     CFRunLoopRef theRL = CFRunLoopGetCurrent();
     CFMachPortRef keyUpEventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged), &keyDownCallBack, NULL);
     CFRunLoopSourceRef keyUpRunLoopSourceRef = CFMachPortCreateRunLoopSource(NULL, keyUpEventTap, 0);
     CFRunLoopAddSource(theRL, keyUpRunLoopSourceRef, kCFRunLoopDefaultMode);
     CGEventTapEnable(keyUpEventTap, true);
 
-    write_local_clipboard("word hello", 10);
     CFRunLoopRun();
 
     CFRelease(keyUpEventTap);
