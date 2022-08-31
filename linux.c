@@ -8,10 +8,14 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/Xfixes.h>
 #include "linux.h"
 #include "msg.h"
 #include "udp_helper.h"
 
+// wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
+// maybe use x11 api to rewrite them in the future?
 char* read_local_clipboard(int *len)
 {
     int fds[2]; 
@@ -63,50 +67,41 @@ void write_local_clipboard(char *buf, int len)
     }
 }
 
+// https://stackoverflow.com/questions/8755471/x11-wait-for-and-get-clipboard-text
 void clipboard_monitor_loop()
 {
-    int fd_kb, ctrl_down = 0;
-
-    struct input_event event_kb;
-
-    // could it be other event on some device?
-    fd_kb = open("/dev/input/event4", O_RDONLY);
-    if (fd_kb <= 0)
-    {
-        perror("open device error\n");
+    Display *dpy = XOpenDisplay(NULL);
+    if (!dpy) {
+        perror("Failed to open X display\n");
         return;
     }
 
-    while (1)
-    {
-        if (read(fd_kb, &event_kb, sizeof(event_kb)) == sizeof(event_kb))
-        {
-            if (event_kb.type == EV_KEY)
-            {
-                if (event_kb.value == 0 || event_kb.value == 1)//1表示按下，0表示释放，会检测到两次
-                {
-                    if ((event_kb.code == KEY_LEFTCTRL || event_kb.code == KEY_RIGHTCTRL) && event_kb.value)
-                    {
-                        ctrl_down = 1;
-                    }
-                    else if ((event_kb.code == KEY_LEFTCTRL || event_kb.code == KEY_RIGHTCTRL))
-                    {
-                        ctrl_down = 0;
-                    }
+    Atom clipboard = XInternAtom(dpy, "CLIPBOARD", False);
 
-                    if ((event_kb.code == KEY_C || event_kb.code == KEY_X) && event_kb.value == 1 && ctrl_down)
-                    {
-                        int cb_len = 0;
-                        char *cb_buf = read_local_clipboard(&cb_len);
-                        char send_buf[8192] = {0};
-                        int msg_len = gen_msg_clipboard_update(send_buf);
-                        memcpy(send_buf + msg_len, cb_buf, cb_len);
-                        udp_broadcast_to_known(send_buf, msg_len + cb_len);
-                        free(cb_buf);
-                    }
-                }
-            }
+    int event_base, error_base;
+    XEvent event;
+
+    if (!XFixesQueryExtension(dpy, &event_base, &error_base))
+    {
+        perror("XFixesQueryExtension failed\n");
+        return;
+    }
+    XFixesSelectSelectionInput(dpy, DefaultRootWindow(dpy), clipboard, XFixesSetSelectionOwnerNotifyMask);
+
+    while (True)
+    {
+        XNextEvent(dpy, &event);
+
+        if (event.type == event_base + XFixesSelectionNotify &&
+            ((XFixesSelectionNotifyEvent *)&event)->selection == clipboard)
+        {
+            int cb_len = 0;
+            char *cb_buf = read_local_clipboard(&cb_len);
+            char send_buf[8192] = {0};
+            int msg_len = gen_msg_clipboard_update(send_buf);
+            memcpy(send_buf + msg_len, cb_buf, cb_len);
+            udp_broadcast_to_known(send_buf, msg_len + cb_len);
+            free(cb_buf);
         }
     }
-    close(fd_kb);
 }

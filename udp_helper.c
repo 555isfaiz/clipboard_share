@@ -184,7 +184,7 @@ void *server_loop()
 {
 	char buffer[8192] = {0};
 	struct sockaddr_in sendaddr;
-	size_t len = sizeof(sendaddr);
+	unsigned int len = sizeof(sendaddr);
 
 #ifdef _WIN32
 	WSADATA wsaData;
