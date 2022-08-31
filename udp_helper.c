@@ -30,6 +30,15 @@ int addr_list_ptr = 0;
 
 void add_to_addr_list(struct sockaddr_in *addr)
 {
+	for (int i = 0; i < addr_list_ptr; i++)
+	{
+		if (addr_list[i].sin_addr.s_addr == addr->sin_addr.s_addr && addr_list[i].sin_port == addr->sin_port)
+		{
+			// already in the list
+			return;
+		}
+	}
+
 	if (addr_list_ptr + 1 == addr_list_size)
 	{
 		addr_list_size <<= 1;
@@ -47,7 +56,7 @@ void remove_from_addr_list(struct sockaddr_in addr)
 {
 	for (int i = 0; i < addr_list_ptr; i++)
 	{
-		if (addr_list[i].sin_addr.s_addr == addr.sin_addr.s_addr)
+		if (addr_list[i].sin_addr.s_addr == addr.sin_addr.s_addr && addr_list[i].sin_port == addr.sin_port)
 		{
 			memcpy(&addr_list[i], &addr_list[i + 1], (addr_list_ptr - i - 1) * sizeof(struct sockaddr_in));
 			addr_list_ptr--;
@@ -149,6 +158,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 	buf_len = gen_msg_clipboard_update(buffer);
 	if (strncmp(buf, buffer, buf_len) == 0)
 	{
+		write_local_clipboard(buf + buf_len, len - buf_len);
 		printf("clipboard update: %s\n", buf + buf_len);
 	}
 }
