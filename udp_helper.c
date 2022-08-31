@@ -151,7 +151,7 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 
 void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 {
-	char buffer[32] = {0};
+	char buffer[64] = {0};
 
 	// msg online: other device is online
 	int buf_len = gen_msg_online(buffer);
@@ -183,7 +183,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 
 void *server_loop()
 {
-	char buffer[128] = {0};
+	char buffer[8192] = {0};
 	struct sockaddr_in sendaddr;
 	size_t len = sizeof(sendaddr);
 

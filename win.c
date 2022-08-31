@@ -3,6 +3,56 @@
 #include "win.h"
 #include "udp_helper.h"
 
+extern int is_gbk;
+
+int isGBK(unsigned char* data, int len) {
+    int i = 0;
+    while (i < len) {
+        if (data[i] <= 0x7f) {
+            i++;
+            continue;
+        }
+        else {
+            if (data[i] >= 0x81 &&
+                data[i] <= 0xfe &&
+                data[i + 1] >= 0x40 &&
+                data[i + 1] <= 0xfe &&
+                data[i + 1] != 0xf7) {
+                i += 2;
+                continue;
+            }
+            else {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+char *GBKToUTF8(char *strAscii)
+{
+    int l = MultiByteToWideChar(CP_ACP, 0, strAscii, -1, NULL, 0);
+    wchar_t* wstr = calloc(l + 1, sizeof(wchar_t));
+    MultiByteToWideChar(CP_ACP, 0, strAscii, -1, wstr, l);
+    l = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+    char* str = calloc(l + 1, 1);
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, str, l, NULL, NULL);
+    free(wstr);
+    return str;
+}
+
+char *UTF8ToGBK(char* strAscii)
+{
+    int len = MultiByteToWideChar(CP_UTF8, 0, strAscii, -1, NULL, 0);
+    wchar_t* wszGBK = calloc(len + 1, sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, strAscii, -1, wszGBK, len);
+    len = WideCharToMultiByte(CP_ACP, 0, wszGBK, -1, NULL, 0, NULL, NULL);
+    char* szGBK = calloc(len + 1, 1);
+    WideCharToMultiByte(CP_ACP, 0, wszGBK, -1, szGBK, len, NULL, NULL);
+    free(wszGBK);
+    return szGBK;
+}
+
 char* read_local_clipboard(int* len)
 {
     HWND hWnd = NULL;
@@ -17,8 +67,19 @@ char* read_local_clipboard(int* len)
             perror("Global lock failed\n");
             return NULL;
         }
+
+        char* tmp = calloc(strlen(buf) + 1, 1);
+        memcpy(tmp, buf, strlen(buf));
+        buf = tmp;
+
         GlobalUnlock(h);
         CloseClipboard();
+        if (isGBK(buf, *len))
+        {
+            char *t = GBKToUTF8(buf);
+            free(buf);
+            buf = t;
+        }
         *len = strlen(buf);
         return buf;
     } 
@@ -45,10 +106,21 @@ void write_local_clipboard(char* buf, int len)
         perror("Global lock failed\n");
         return;
     }
-    strcpy(pData, buf);
+
+    char* t = calloc(len + 1, 1);
+    memcpy(t, buf, len);
+    if (is_gbk)
+    {
+        char *tmp = UTF8ToGBK(buf);
+        free(t);
+        t = tmp;
+    }
+
+    strcpy(pData, t);
     SetClipboardData(CF_TEXT, hHandle);
     GlobalUnlock(hHandle);
     CloseClipboard();
+    free(t);
 }
 
 LRESULT CALLBACK ClipWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

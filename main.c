@@ -15,6 +15,7 @@
 #endif
 
 extern int SERVER_PORT;
+int is_gbk = 0;
 
 void print_usage(char *proc)
 {
@@ -22,14 +23,15 @@ void print_usage(char *proc)
                    "options:\n"
                    " -h      print this help.\n"
                    " -t      set the token for clipboard_share and run.\n"
-                   " -p      set the port for udp server.\n",
+                   " -p      set the port for udp server.\n"
+                   " -g      denotes whether local machine is using gbk encoding.\n",
                    proc);
 }
 
 int main(int argc, char *argv[])
 {
     int opt, has_token = 0, ret;
-    while ((opt = getopt(argc, argv, "ht:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "ht:p:g")) != -1) {
         switch(opt) {
         case 't':
             has_token = 1;
@@ -39,6 +41,10 @@ int main(int argc, char *argv[])
         case 'p':
             has_token = 1;
             SERVER_PORT = atoi(optarg);
+            break;
+
+        case 'g':
+            is_gbk = 1;
             break;
 
         case 'h':
