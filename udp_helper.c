@@ -1,21 +1,31 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <errno.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <arpa/inet.h>
-#include <ifaddrs.h>
 #include <string.h>
 #include "msg.h"
 #include "udp_helper.h"
 
 #ifdef _WIN32
-// TODO
+#include <winsock.h>
+#include <process.h>
+#include <windows.h>
+#pragma comment(lib,"wsock32.lib")
+#include "win.h"
 #elif __linux__
+#include <unistd.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include "linux.h"
 #elif __APPLE__
+#include <unistd.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include "mac.h"
 #endif
 
@@ -67,6 +77,14 @@ void remove_from_addr_list(struct sockaddr_in addr)
 
 int udp_init()
 {
+#ifdef _WIN32
+	WSADATA data;
+	if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
+	{
+		return 0;
+	}
+#endif
+
 	udp_client_socket = socket(AF_INET, SOCK_DGRAM, 0);
 	if(0 > udp_client_socket)
 	{
@@ -167,8 +185,26 @@ void *server_loop()
 {
 	char buffer[128] = {0};
 	struct sockaddr_in sendaddr;
-	socklen_t len = sizeof(sendaddr);
+	size_t len = sizeof(sendaddr);
 
+#ifdef _WIN32
+	WSADATA wsaData;
+	char name[255];
+	PHOSTENT hostinfo;
+
+	if (WSAStartup(MAKEWORD(2, 0), &wsaData) == 0)
+	{
+		if (gethostname(name, sizeof(name)) == 0)
+		{
+			if ((hostinfo = gethostbyname(name)) == NULL)
+			{
+				perror("can't get local ip");
+				return (void*)0;
+			}
+		}
+		WSACleanup();
+	}
+#else
 	struct ifaddrs *ifaddr, *ifa;
 
 	if (getifaddrs(&ifaddr) == -1)
@@ -176,6 +212,8 @@ void *server_loop()
 		perror("getifaddrs");
 		return (void *)0;
 	}
+#endif
+
 
 	while (1)
 	{
@@ -186,7 +224,12 @@ void *server_loop()
 			perror("recvfrom error");
 			break;
 		}
-
+#ifdef _WIN32
+		if (( * (struct in_addr*)*hostinfo->h_addr_list).s_addr == sendaddr.sin_addr.s_addr)
+		{
+			goto lo_start;
+		}
+#else
 		for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
 		{
 			if (ifa->ifa_addr == NULL)
@@ -197,11 +240,15 @@ void *server_loop()
 				goto lo_start;
 			}
 		}
+#endif
 
 		handle_datagram(buffer, ret, sendaddr);
 	}
 
+#ifndef _WIN32
    	freeifaddrs(ifaddr);
+#endif
+
 	return (void*)0;
 }
 
@@ -230,15 +277,19 @@ int udp_server_init()
 	}
 
 	// start thread
+#ifdef _WIN32
+	_beginthread(server_loop, 0, NULL);
+#else
 	pthread_t ntid;
 	int err;
 
 	err = pthread_create(&ntid, NULL, server_loop, NULL);
-	if(err != 0)
+	if (err != 0)
 	{
 		perror("can't create thread for udp server");
 		return err;
 	}
+#endif
 
 	return 0;
 }

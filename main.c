@@ -1,17 +1,17 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <getopt.h>
-#include <pthread.h>
-#include <unistd.h>
 #include "udp_helper.h"
 #include "msg.h"
 
 #ifdef _WIN32
-// TODO
+#include "getopt_win.h"
+#include "win.h"
 #elif __linux__
 #include "linux.h"
+#include <getopt.h>
 #elif __APPLE__
 #include "mac.h"
+#include <getopt.h>
 #endif
 
 extern int SERVER_PORT;

@@ -1,7 +1,12 @@
 #ifndef __UDP_HELPER__
 #define __UDP_HELPER__
 
+#ifdef _WIN32
+#include <winsock.h>
+#else
 #include <netinet/in.h>
+#endif
+
 
 int udp_init();
 
