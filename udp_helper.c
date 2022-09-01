@@ -242,6 +242,7 @@ void *server_loop()
 #endif
 
 		handle_datagram(buffer, ret, sendaddr);
+		memset(buffer, 0, 8192);
 	}
 
 #ifndef _WIN32
