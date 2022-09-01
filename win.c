@@ -4,6 +4,7 @@
 #include "udp_helper.h"
 
 extern int is_gbk;
+int write_bit = 0;
 
 int isGBK(unsigned char* data, int len) {
     int i = 0;
@@ -121,6 +122,7 @@ void write_local_clipboard(char* buf, int len)
     GlobalUnlock(hHandle);
     CloseClipboard();
     free(t);
+    write_bit = 1;
 }
 
 LRESULT CALLBACK ClipWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -142,6 +144,11 @@ LRESULT CALLBACK ClipWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_CLIPBOARDUPDATE:
         {
+            if (write_bit)
+            {
+                write_bit = 0;
+                return 0;
+            }
             int cb_len = 0;
             char* cb_buf = read_local_clipboard(&cb_len);
             char send_buf[8192] = { 0 };
