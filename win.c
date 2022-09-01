@@ -108,6 +108,7 @@ void write_local_clipboard(char* buf, int len)
         return;
     }
 
+    write_bit = 1;
     char* t = calloc(len + 1, 1);
     memcpy(t, buf, len);
     if (is_gbk)
@@ -122,7 +123,6 @@ void write_local_clipboard(char* buf, int len)
     GlobalUnlock(hHandle);
     CloseClipboard();
     free(t);
-    write_bit = 1;
 }
 
 LRESULT CALLBACK ClipWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

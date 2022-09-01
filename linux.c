@@ -48,6 +48,7 @@ char* read_local_clipboard(int *len)
 
 void write_local_clipboard(char *buf, int len)
 {
+    write_bit = 1;
     int fds[2]; 
     pipe(fds);
     int pid = fork(), status = 0;
@@ -67,7 +68,6 @@ void write_local_clipboard(char *buf, int len)
         close(fds[1]);
         waitpid(pid, &status, 0);
     }
-    write_bit = 1;
 }
 
 // https://stackoverflow.com/questions/8755471/x11-wait-for-and-get-clipboard-text
