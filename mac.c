@@ -1,7 +1,4 @@
 #include <unistd.h>
-#include <CoreGraphics/CoreGraphics.h>
-#include <CoreGraphics/CGEvent.h>
-#include <CoreGraphics/CGDirectDisplay.h>
 #include <Carbon/Carbon.h>
 #include "udp_helper.h"
 #include "mac.h"
@@ -14,6 +11,7 @@
 #define PLAINTEXT CFSTR("public.utf8-plain-text")
 
 static PasteboardRef clipboard;
+int write_bit = 0;
 
 char* read_local_clipboard(int *len)
 {
@@ -75,6 +73,7 @@ void write_local_clipboard(char *buf, int len)
 	 */
 	PasteboardClear(clipboard);
 
+	write_bit = 1;
 	status = PasteboardPutItemFlavor(clipboard, (PasteboardItemID)data,
 	                                 PLAINTEXT, data, 0);
 	if (status != noErr) 
@@ -83,34 +82,6 @@ void write_local_clipboard(char *buf, int len)
 	}
 
 	CFRelease(data);
-}
-
-CGEventRef keyDownCallBack(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *userInfo)
-{
-    UniCharCount actualStringLength = 0;
-    UniChar inputString[128];
-    CGEventKeyboardGetUnicodeString(event, 128, &actualStringLength, inputString);
-
-    CGEventFlags flag = CGEventGetFlags(event);
-
-    // is command key down?
-    if ((flag & kCGEventFlagMaskCommand) != kCGEventFlagMaskCommand) return event;
-
-    for (size_t i = 0; i < actualStringLength; i++)
-    {
-        if (inputString[i] == 'x' || inputString[i] == 'c')
-        {
-            int cb_len = 0;
-            char *cb_buf = read_local_clipboard(&cb_len);
-            char send_buf[8192] = {0};
-            int msg_len = gen_msg_clipboard_update(send_buf);
-            memcpy(send_buf + msg_len, cb_buf, cb_len);
-            udp_broadcast_to_known(send_buf, msg_len + cb_len);
-            free(cb_buf);
-            break;
-        }
-    }
-    return event;
 }
 
 void clipboard_monitor_loop()
@@ -122,14 +93,23 @@ void clipboard_monitor_loop()
 		return;
 	}
 
-    CFRunLoopRef theRL = CFRunLoopGetCurrent();
-    CFMachPortRef keyUpEventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged), &keyDownCallBack, NULL);
-    CFRunLoopSourceRef keyUpRunLoopSourceRef = CFMachPortCreateRunLoopSource(NULL, keyUpEventTap, 0);
-    CFRunLoopAddSource(theRL, keyUpRunLoopSourceRef, kCFRunLoopDefaultMode);
-    CGEventTapEnable(keyUpEventTap, true);
-
-    CFRunLoopRun();
-
-    CFRelease(keyUpEventTap);
-    CFRelease(keyUpRunLoopSourceRef);
+	while (1)
+	{
+		if (PasteboardSynchronize(clipboard) & kPasteboardModified)
+		{
+			if (write_bit)
+			{
+				write_bit = 0;
+				continue;
+			}
+			int cb_len = 0;
+            char *cb_buf = read_local_clipboard(&cb_len);
+            char send_buf[8192] = {0};
+            int msg_len = gen_msg_clipboard_update(send_buf);
+            memcpy(send_buf + msg_len, cb_buf, cb_len);
+            udp_broadcast_to_known(send_buf, msg_len + cb_len);
+            free(cb_buf);
+		}
+		sleep(1);
+	}
 }
