@@ -14,6 +14,8 @@
 #include "msg.h"
 #include "udp_helper.h"
 
+int write_bit = 0;
+
 // wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
 // maybe use x11 api to rewrite them in the future?
 char* read_local_clipboard(int *len)
@@ -65,6 +67,7 @@ void write_local_clipboard(char *buf, int len)
         close(fds[1]);
         waitpid(pid, &status, 0);
     }
+    write_bit = 1;
 }
 
 // https://stackoverflow.com/questions/8755471/x11-wait-for-and-get-clipboard-text
@@ -91,6 +94,12 @@ void clipboard_monitor_loop()
     while (True)
     {
         XNextEvent(dpy, &event);
+
+        if (write_bit)
+        {
+            write_bit = 0;
+            continue;
+        }
 
         if (event.type == event_base + XFixesSelectionNotify &&
             ((XFixesSelectionNotifyEvent *)&event)->selection == clipboard)
