@@ -11,7 +11,6 @@
 #define PLAINTEXT CFSTR("public.utf8-plain-text")
 
 static PasteboardRef clipboard;
-int write_bit = 0;
 
 char* read_local_clipboard(int *len)
 {
@@ -73,7 +72,6 @@ void write_local_clipboard(char *buf, int len)
 	 */
 	PasteboardClear(clipboard);
 
-	write_bit = 1;
 	status = PasteboardPutItemFlavor(clipboard, (PasteboardItemID)data,
 	                                 PLAINTEXT, data, 0);
 	if (status != noErr) 
@@ -97,11 +95,6 @@ void clipboard_monitor_loop()
 	{
 		if (PasteboardSynchronize(clipboard) & kPasteboardModified)
 		{
-			if (write_bit)
-			{
-				write_bit = 0;
-				continue;
-			}
 			int cb_len = 0;
             char *cb_buf = read_local_clipboard(&cb_len);
             char send_buf[8192] = {0};
