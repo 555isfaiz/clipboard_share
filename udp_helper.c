@@ -68,7 +68,7 @@ void remove_from_addr_list(struct sockaddr_in addr)
 	{
 		if (addr_list[i].sin_addr.s_addr == addr.sin_addr.s_addr && addr_list[i].sin_port == addr.sin_port)
 		{
-			memcpy(&addr_list[i], &addr_list[i + 1], (addr_list_ptr - i - 1) * sizeof(struct sockaddr_in));
+			memcpy(&(addr_list[i]), &(addr_list[i + 1]), (addr_list_ptr - i - 1) * sizeof(struct sockaddr_in));
 			addr_list_ptr--;
 			break;
 		}

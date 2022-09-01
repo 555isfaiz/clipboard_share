@@ -30,7 +30,7 @@ endif
 
 LDFLAGS = -fsanitize=address -pthread -ldl $(EXTRA_FLAGS)
 
-.PHONY: main clean
+.PHONY: clipboardshare clean
 
 clipboardshare: $(SOURCES:.c=.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
@@ -38,7 +38,7 @@ clipboardshare: $(SOURCES:.c=.o)
 $(SOURCES:.c=.o): $(HEADERS)
 
 clean:
-	rm -f main *.o
+	rm -f clipboardshare *.o
 
 install:
 	sudo cp clipboardshare /usr/bin/clipboardshare
