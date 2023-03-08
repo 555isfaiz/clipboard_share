@@ -29,8 +29,8 @@ char* read_local_clipboard(int *len)
         while ((dup2(fds[1], STDOUT_FILENO) == -1) && (errno == EINTR)) {}
         close(fds[0]);
         close(fds[1]);
-        char* argument_list[] = {"--clipboard", NULL};
-        execvp("xsel", argument_list);
+        char* argument_list[] = {"xclip", "-selection", "clipboard", "-o", NULL};
+        execvp("xclip", argument_list);
         exit(1);
     }
     else
@@ -57,8 +57,8 @@ void write_local_clipboard(char *buf, int len)
         while ((dup2(fds[0], STDIN_FILENO) == -1) && (errno == EINTR)) {}
         close(fds[0]);
         close(fds[1]);
-        char* argument_list[] = {"--input", "--clipboard", NULL};
-        execvp("xsel", argument_list);
+        char* argument_list[] = {"xclip", "-selection", "clipboard", "-i", NULL};
+        execvp("xclip", argument_list);
         exit(1);
     }
     else
