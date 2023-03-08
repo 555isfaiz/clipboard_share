@@ -15,6 +15,7 @@
 #include "udp_helper.h"
 
 int write_bit = 0;
+extern unsigned buffer_size;
 
 // wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
 // maybe use x11 api to rewrite them in the future?

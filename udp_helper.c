@@ -38,6 +38,9 @@ struct sockaddr_in *addr_list;
 int addr_list_size = 8;
 int addr_list_ptr = 0;
 
+extern unsigned buffer_size;
+char *buffer_;
+
 void add_to_addr_list(struct sockaddr_in *addr)
 {
 	for (int i = 0; i < addr_list_ptr; i++)
@@ -182,7 +185,6 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 
 void *server_loop()
 {
-	char buffer[8192] = {0};
 	struct sockaddr_in sendaddr;
 	unsigned int len = sizeof(sendaddr);
 
@@ -217,7 +219,7 @@ void *server_loop()
 	while (1)
 	{
 		lo_start: ;
-		int ret  = recvfrom(udp_server_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&sendaddr, &len);
+		int ret  = recvfrom(udp_server_socket, buffer_, buffer_size, 0, (struct sockaddr*)&sendaddr, &len);
 		if(ret < 0)
 		{
 			perror("recvfrom error");
@@ -241,8 +243,8 @@ void *server_loop()
 		}
 #endif
 
-		handle_datagram(buffer, ret, sendaddr);
-		memset(buffer, 0, 8192);
+		handle_datagram(buffer_, ret, sendaddr);
+		memset(buffer_, 0, buffer_size);
 	}
 
 #ifndef _WIN32
@@ -291,6 +293,13 @@ int udp_server_init()
 	}
 #endif
 
+	buffer_ = calloc(buffer_size * 1024, sizeof(char));
+	if (!buffer_)
+	{
+		perror("failed to create buffer:");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -298,5 +307,6 @@ int udp_close()
 {
 	close(udp_client_socket);
 	close(udp_server_socket);
+	free(buffer_);
 	return 0;
 }
