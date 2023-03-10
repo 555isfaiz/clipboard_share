@@ -18,14 +18,12 @@ UNAME_S := $(shell uname -s)
 SOURCES = main.c  msg.c  udp_helper.c  $(PLATFORM_SOURCES)
 HEADERS = msg.h  udp_helper.h  $(PLATFORM_HEADERS)
 
-ver = debug
- 
-ifeq ($(ver), debug)
-CFLAGS = -g3 -ggdb -Wall -fsanitize=address \
-		 -fno-omit-frame-pointer -pthread
+ifdef DEBUG
+CFLAGS = -g3 -ggdb3 -Wall -fsanitize=address -fstack-protector-all \
+		-fno-omit-frame-pointer -pthread
 else
-CFLAGS = -Og -Wall -fsanitize=address \
-		 -fno-omit-frame-pointer -pthread
+CFLAGS = -O3 -Wall -fsanitize=address -fstack-protector-all \
+		-fno-omit-frame-pointer -pthread
 endif
 
 LDFLAGS = -fsanitize=address -pthread -ldl $(EXTRA_FLAGS)
