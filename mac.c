@@ -9,8 +9,28 @@
  *   https://developer.apple.com/Library/mac/documentation/Miscellaneous/Reference/UTIRef/Articles/System-DeclaredUniformTypeIdentifiers.html
  */
 #define PLAINTEXT CFSTR("public.utf8-plain-text")
+#define IMAGE_PNG CFSTR("public.png")
 
 static PasteboardRef clipboard;
+
+CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
+{
+	OSStatus status;
+	CFArrayRef buf;
+
+	status = PasteboardCopyItemFlavors(clipboard, itemid, &buf);
+	if (status != noErr) 
+    {
+        errno = status;
+		perror("PasteboardCopyItemFlavorData(PLAINTEXT) failed\n");
+		return (void *)0;
+	}
+
+	// ...
+
+	CFRelease(buf);
+	return PLAINTEXT;
+}
 
 char* read_local_clipboard(int *len)
 {
@@ -35,11 +55,13 @@ char* read_local_clipboard(int *len)
 		return NULL;
 	}
 
-	status = PasteboardCopyItemFlavorData(clipboard, itemid, PLAINTEXT, &data);
+	CFStringRef type = get_pasteboard_item_flavor(itemid);
+
+	status = PasteboardCopyItemFlavorData(clipboard, itemid, type, &data);
 	if (status != noErr) 
     {
         errno = status;
-		perror("PasteboardCopyItemFlavorData(PLAINTEXT) failed\n");
+		perror("PasteboardCopyItemFlavorData() failed\n");
 		return NULL;
 	}
 
