@@ -4,3 +4,5 @@ test.c
 test
 main
 clipboardshare
+nohup.out
+run_clipboard_share.sh
