@@ -12,13 +12,15 @@
 #define IMAGE_PNG CFSTR("public.png")
 
 static PasteboardRef clipboard;
+extern unsigned buffer_size;
+char *buffer_;
 
 CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
 {
 	OSStatus status;
-	CFArrayRef buf;
+	CFArrayRef arr;
 
-	status = PasteboardCopyItemFlavors(clipboard, itemid, &buf);
+	status = PasteboardCopyItemFlavors(clipboard, itemid, &arr);
 	if (status != noErr) 
     {
         errno = status;
@@ -26,10 +28,24 @@ CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
 		return (void *)0;
 	}
 
-	// ...
+	CFStringRef type = (void *)0;
+	for (int i = 0; i < CFArrayGetCount(arr); i++)
+	{
+		CFStringRef sName = (CFStringRef)CFArrayGetValueAtIndex(arr, i);
+		if (CFStringCompare(sName, IMAGE_PNG, kCFCompareCaseInsensitive) == kCFCompareEqualTo)
+		{
+			type = IMAGE_PNG;
+			break;
+		}
+		else if (CFStringCompare(sName, PLAINTEXT, kCFCompareCaseInsensitive) == kCFCompareEqualTo)
+		{
+			type = PLAINTEXT;
+			break;
+		}
+	}
 
-	CFRelease(buf);
-	return PLAINTEXT;
+	CFRelease(arr);
+	return type;
 }
 
 char* read_local_clipboard(int *len)
@@ -107,9 +123,17 @@ void write_local_clipboard(char *buf, int len)
 void clipboard_monitor_loop()
 {
     OSStatus status = PasteboardCreate(kPasteboardClipboard, &clipboard);
-	if (status != noErr) {
+	if (status != noErr) 
+	{
         errno = status;
 		perror("PasteboardCreate() failed\n");
+		return;
+	}
+
+	buffer_ = (char *)calloc(buffer_size, sizeof(char));
+	if (!buffer_)
+	{
+		perror("failed to alloca buffer for pasteboard monitering.\n");
 		return;
 	}
 
