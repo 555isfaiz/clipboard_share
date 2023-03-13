@@ -14,13 +14,14 @@
 #include "msg.h"
 #include "udp_helper.h"
 
+#define PLAINTEXT "UTF8_STRING"
+#define IMAGEPNG "image/png"
+
 int write_bit = 0;
 extern unsigned buffer_size;
 char *cb_buffer_;
 
-// wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
-// maybe use x11 api to rewrite them in the future?
-void read_local_clipboard(int *len)
+void read_fork(const char *command, char * const* arg, char *buffer, int len, int *len_out)
 {
     int fds[2]; 
     pipe(fds);
@@ -30,18 +31,41 @@ void read_local_clipboard(int *len)
         while ((dup2(fds[1], STDOUT_FILENO) == -1) && (errno == EINTR)) {}
         close(fds[0]);
         close(fds[1]);
-        char* argument_list[] = {"xclip", "-selection", "clipboard", "-o", NULL};
-        execvp("xclip", argument_list);
+        execvp(command, arg);
         exit(1);
     }
     else
     {
         close(fds[1]);
-        int read_len = read(fds[0], cb_buffer_, buffer_size);
-        *len = read_len;
+        if ((*len_out = read(fds[0], buffer, len)) <= 0)
+            perror("error reading from fork ");
         close(fds[0]);
         waitpid(pid, &status, 0);
     }
+}
+
+const char *get_clipboard_type()
+{
+    int len = 0;
+    const char *argument_list[] = {"xclip", "-selection", "clipboard", "-t", "TARGETS", "-o", NULL};
+    read_fork("xclip", argument_list, cb_buffer_, buffer_size, &len);   // no need to use a new buffer here
+    if (len <= 0)
+        return 0;
+
+    if (strstr(cb_buffer_, IMAGEPNG))
+        return IMAGEPNG;
+    else if (strstr(cb_buffer_, PLAINTEXT))
+        return PLAINTEXT;
+    return 0;
+}
+
+// wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
+// maybe use x11 api to rewrite them in the future?
+void read_local_clipboard(int *len)
+{
+    const char *type = get_clipboard_type();
+    const char* argument_list[] = {"xclip", "-selection", "clipboard", "-t", type, "-o", NULL};
+    read_fork("xclip", argument_list, cb_buffer_, buffer_size, len);
 }
 
 void write_local_clipboard(char *buf, int len)
@@ -114,10 +138,7 @@ void clipboard_monitor_loop()
             if (cb_len <= 0)
                 continue;
 
-            char send_buf[8192] = {0};
-            int msg_len = gen_msg_clipboard_update(send_buf);
-            memcpy(send_buf + msg_len, cb_buffer_, cb_len);
-            udp_broadcast_to_known(send_buf, msg_len + cb_len);
+            udp_broadcast_to_known(cb_buffer_, cb_len);
         }
     }
 
