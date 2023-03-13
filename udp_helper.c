@@ -4,13 +4,14 @@
 #include <string.h>
 #include "msg.h"
 #include "udp_helper.h"
+#include "clipboard.h"
 
 #ifdef _WIN32
 #include <winsock.h>
 #include <process.h>
 #include <windows.h>
 #pragma comment(lib,"wsock32.lib")
-#include "win.h"
+// #include "win.h"
 #elif __linux__
 #include <unistd.h>
 #include <pthread.h>
@@ -18,7 +19,7 @@
 #include <ifaddrs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "linux.h"
+// #include "linux.h"
 #elif __APPLE__
 #include <unistd.h>
 #include <pthread.h>
@@ -26,7 +27,7 @@
 #include <ifaddrs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "mac.h"
+// #include "mac.h"
 #endif
 
 int SERVER_PORT = 53338;

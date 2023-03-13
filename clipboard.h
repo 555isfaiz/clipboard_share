@@ -1,7 +1,7 @@
-#ifndef __HLINUX__
-#define __HLINUX__
+#ifndef __HCLIPBOARD__
+#define __HCLIPBOARD__
 
-char* read_local_clipboard(int *len);
+void read_local_clipboard(int *len);
 
 void write_local_clipboard(char *buf, int len);
 

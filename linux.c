@@ -10,19 +10,19 @@
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/Xfixes.h>
-#include "linux.h"
+#include "clipboard.h"
 #include "msg.h"
 #include "udp_helper.h"
 
 int write_bit = 0;
 extern unsigned buffer_size;
+char *cb_buffer_;
 
 // wrote read_local_clipboard() and write_local_clipboard() before I was awared of X11 apis.
 // maybe use x11 api to rewrite them in the future?
-char* read_local_clipboard(int *len)
+void read_local_clipboard(int *len)
 {
     int fds[2]; 
-    char *buf;
     pipe(fds);
     int pid = fork(), status = 0;
     if (pid == 0)
@@ -37,14 +37,11 @@ char* read_local_clipboard(int *len)
     else
     {
         close(fds[1]);
-        buf = calloc(4096, 1);
-        int read_len = read(fds[0], buf, 4096);
+        int read_len = read(fds[0], cb_buffer_, buffer_size);
         *len = read_len;
         close(fds[0]);
         waitpid(pid, &status, 0);
     }
-
-    return buf;
 }
 
 void write_local_clipboard(char *buf, int len)
@@ -92,6 +89,13 @@ void clipboard_monitor_loop()
     }
     XFixesSelectSelectionInput(dpy, DefaultRootWindow(dpy), clipboard, XFixesSetSelectionOwnerNotifyMask);
 
+    cb_buffer_ = (char *)calloc(buffer_size, sizeof(char));
+    if (!cb_buffer_)
+    {
+        perror("failed allocate using calloc");
+        return;
+    }
+
     while (True)
     {
         XNextEvent(dpy, &event);
@@ -106,17 +110,16 @@ void clipboard_monitor_loop()
             ((XFixesSelectionNotifyEvent *)&event)->selection == clipboard)
         {
             int cb_len = 0;
-            char *cb_buf = read_local_clipboard(&cb_len);
+            read_local_clipboard(&cb_len);
             if (cb_len <= 0)
-            {
-                free(cb_buf);
                 continue;
-            }
+
             char send_buf[8192] = {0};
             int msg_len = gen_msg_clipboard_update(send_buf);
-            memcpy(send_buf + msg_len, cb_buf, cb_len);
+            memcpy(send_buf + msg_len, cb_buffer_, cb_len);
             udp_broadcast_to_known(send_buf, msg_len + cb_len);
-            free(cb_buf);
         }
     }
+
+    free(cb_buffer_);
 }

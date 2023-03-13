@@ -2,15 +2,16 @@
 #include <stdio.h>
 #include "udp_helper.h"
 #include "msg.h"
+#include "clipboard.h"
 
 #ifdef _WIN32
 #include "getopt_win.h"
-#include "win.h"
+// #include "win.h"
 #elif __linux__
-#include "linux.h"
+// #include "linux.h"
 #include <getopt.h>
 #elif __APPLE__
-#include "mac.h"
+// #include "mac.h"
 #include <getopt.h>
 #endif
 
