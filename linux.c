@@ -44,7 +44,7 @@ void read_fork(const char *command, char * const* arg, char *buffer, int len, in
     }
 }
 
-const char *get_clipboard_type()
+uint8_t get_clipboard_type(char *type_out)
 {
     int len = 0;
     const char *argument_list[] = {"xclip", "-selection", "clipboard", "-t", "TARGETS", "-o", NULL};
@@ -52,10 +52,14 @@ const char *get_clipboard_type()
     if (len <= 0)
         return 0;
 
-    if (strstr(cb_buffer_, IMAGEPNG))
-        return IMAGEPNG;
-    else if (strstr(cb_buffer_, PLAINTEXT))
-        return PLAINTEXT;
+    if (strstr(cb_buffer_, IMAGEPNG)) {
+        strcpy(type_out, IMAGEPNG);
+        return CB_TYPE_IMAGE;
+    }
+    else if (strstr(cb_buffer_, PLAINTEXT)) {
+        strcpy(type_out, PLAINTEXT);
+        return CB_TYPE_TEXT;
+    }
     return 0;
 }
 
@@ -63,13 +67,35 @@ const char *get_clipboard_type()
 // maybe use x11 api to rewrite them in the future?
 void read_local_clipboard(int *len)
 {
-    const char *type = get_clipboard_type();
+    char type[16];
+    uint8_t type_code = get_clipboard_type(type);
+    if (!type_code) return;
+
+    int msg_len = gen_msg_clipboard_update(cb_buffer_);
+
+    // write type code
+    (cb_buffer_)[msg_len] = (char)type_code;
+    msg_len++;
+
     const char* argument_list[] = {"xclip", "-selection", "clipboard", "-t", type, "-o", NULL};
-    read_fork("xclip", argument_list, cb_buffer_, buffer_size, len);
+    read_fork("xclip", argument_list, cb_buffer_ + msg_len, buffer_size - msg_len, len);
+    (*len) = (*len) + msg_len;
 }
 
 void write_local_clipboard(char *buf, int len)
 {
+    uint8_t type_code = buf[0];
+    const char *type;
+    if (type_code == CB_TYPE_IMAGE) 
+        type = IMAGEPNG;
+    else if (type_code == CB_TYPE_TEXT)
+        type = PLAINTEXT;
+    else
+    {
+        fprintf(stderr, "unknown type code %u.\n", type_code);
+        return;
+    }
+
     write_bit = 1;
     int fds[2]; 
     pipe(fds);
@@ -79,14 +105,14 @@ void write_local_clipboard(char *buf, int len)
         while ((dup2(fds[0], STDIN_FILENO) == -1) && (errno == EINTR)) {}
         close(fds[0]);
         close(fds[1]);
-        char* argument_list[] = {"xclip", "-selection", "clipboard", "-i", NULL};
+        char* argument_list[] = {"xclip", "-selection", "clipboard", "-t", type, "-i", NULL};
         execvp("xclip", argument_list);
         exit(1);
     }
     else
     {
         close(fds[0]);
-        write(fds[1], buf, len);
+        write(fds[1], buf + 1, len - 1);
         close(fds[1]);
         waitpid(pid, &status, 0);
     }
