@@ -294,7 +294,7 @@ int udp_server_init()
 	}
 #endif
 
-	buffer_ = calloc(buffer_size * 1024, sizeof(char));
+	buffer_ = calloc(buffer_size, sizeof(char));
 	if (!buffer_)
 	{
 		perror("failed to create buffer:");

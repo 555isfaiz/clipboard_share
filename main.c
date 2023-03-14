@@ -17,7 +17,7 @@
 
 extern int SERVER_PORT;
 int is_gbk = 0;
-unsigned buffer_size = 1024;
+unsigned buffer_size = 1024 * 1024;
 
 void print_usage(char *proc)
 {
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
             break;
 
         case 'b':
-            buffer_size = atoi(optarg);
+            buffer_size = atoi(optarg) * 1024;
             break;
 
         case 'h':
