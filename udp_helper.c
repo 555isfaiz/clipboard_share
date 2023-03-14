@@ -142,7 +142,7 @@ int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 	int ret, send_num = 0;
 	if (size > STREAM_SLICE_LEN) 
 	{
-		char tmp[64];
+		char tmp[64] = {0};
 		strcpy(tmp, STREAM_TAG); *((uint32_t *)(tmp + strlen(STREAM_TAG))) = size;
 		ret = sendto(udp_client_socket, tmp, sizeof(tmp), 0, (struct sockaddr *)&addr, sizeof(addr));
 		if (ret < 0)
@@ -262,7 +262,7 @@ void *server_loop()
 		// start stream recv
 		if (strncmp(buffer_, STREAM_TAG, strlen(STREAM_TAG)) == 0)
 		{
-			uint32_t payload_len = (uint64_t)*(buffer_ + strlen(STREAM_TAG));
+			uint32_t payload_len = *((uint32_t *)(buffer_ + strlen(STREAM_TAG)));
 			int off = 0;
 			while (off < payload_len)
 			{
@@ -275,6 +275,7 @@ void *server_loop()
 
 				off += ret;
 			}
+			ret = payload_len;
 		}
 
 		handle_datagram(buffer_, ret, sendaddr);
