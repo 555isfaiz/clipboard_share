@@ -148,7 +148,7 @@ void clipboard_monitor_loop()
 		return;
 	}
 
-	cb_buffer_ = (char *)calloc(buffer_size * 1024, sizeof(char));
+	cb_buffer_ = (char *)calloc(buffer_size, sizeof(char));
 	if (!cb_buffer_)
 	{
 		perror("failed to alloca buffer for pasteboard monitering.\n");
