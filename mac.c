@@ -13,9 +13,9 @@
 
 static PasteboardRef clipboard;
 extern unsigned buffer_size;
-char *buffer_;
+char *cb_buffer_;
 
-CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
+CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid, uint8_t *type_code_out)
 {
 	OSStatus status;
 	CFArrayRef arr;
@@ -34,11 +34,13 @@ CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
 		CFStringRef sName = (CFStringRef)CFArrayGetValueAtIndex(arr, i);
 		if (CFStringCompare(sName, IMAGE_PNG, kCFCompareCaseInsensitive) == kCFCompareEqualTo)
 		{
+			*type_code_out = CB_TYPE_IMAGE;
 			type = IMAGE_PNG;
 			break;
 		}
 		else if (CFStringCompare(sName, PLAINTEXT, kCFCompareCaseInsensitive) == kCFCompareEqualTo)
 		{
+			*type_code_out = CB_TYPE_TEXT;
 			type = PLAINTEXT;
 			break;
 		}
@@ -53,7 +55,6 @@ void read_local_clipboard(int *len)
     OSStatus status;
 	PasteboardItemID itemid;
 	CFDataRef data;
-	char* buf;
 
 	/*
 	 * To avoid error -25130 (badPasteboardSyncErr):
@@ -71,7 +72,14 @@ void read_local_clipboard(int *len)
 		return;
 	}
 
-	CFStringRef type = get_pasteboard_item_flavor(itemid);
+	uint8_t type_code = 0;
+	CFStringRef type = get_pasteboard_item_flavor(itemid, &type_code);
+	if (!type_code)
+		return;
+	
+	int msg_len = gen_msg_clipboard_update(cb_buffer_);
+	(cb_buffer_)[msg_len] = (char)type_code;
+	msg_len++;
 
 	status = PasteboardCopyItemFlavorData(clipboard, itemid, type, &data);
 	if (status != noErr) 
@@ -82,18 +90,30 @@ void read_local_clipboard(int *len)
 	}
 
 	*len = CFDataGetLength(data);
-	buf = calloc(*len + 1, 1);
-	memcpy(buf, CFDataGetBytePtr(data), *len);
+	memcpy(cb_buffer_ + msg_len, CFDataGetBytePtr(data), *len);
+	*len += msg_len;
 
 	CFRelease(data);
 }
 
 void write_local_clipboard(char *buf, int len)
 {
+	uint8_t type_code = buf[0];
+    CFStringRef type;
+    if (type_code == CB_TYPE_IMAGE) 
+        type = IMAGE_PNG;
+    else if (type_code == CB_TYPE_TEXT)
+        type = PLAINTEXT;
+    else
+    {
+        fprintf(stderr, "unknown type code %u.\n", type_code);
+        return;
+    }
+
     OSStatus status;
 	CFDataRef data;
 
-	data = CFDataCreate(NULL, (UInt8*)buf, len);
+	data = CFDataCreate(NULL, (UInt8*)buf + 1, len - 1);
 	if (!data) 
     {
 		perror("CFDataCreate failed\n");
@@ -109,7 +129,7 @@ void write_local_clipboard(char *buf, int len)
 	PasteboardClear(clipboard);
 
 	status = PasteboardPutItemFlavor(clipboard, (PasteboardItemID)data,
-	                                 PLAINTEXT, data, 0);
+	                                 type, data, 0);
 	if (status != noErr) 
     {
 		perror("PasteboardPutItemFlavor() failed\n");
@@ -128,8 +148,8 @@ void clipboard_monitor_loop()
 		return;
 	}
 
-	buffer_ = (char *)calloc(buffer_size, sizeof(char));
-	if (!buffer_)
+	cb_buffer_ = (char *)calloc(buffer_size * 1024, sizeof(char));
+	if (!cb_buffer_)
 	{
 		perror("failed to alloca buffer for pasteboard monitering.\n");
 		return;
@@ -141,11 +161,10 @@ void clipboard_monitor_loop()
 		{
 			int cb_len = 0;
             read_local_clipboard(&cb_len);
-            char send_buf[8192] = {0};
-            int msg_len = gen_msg_clipboard_update(send_buf);
-            memcpy(send_buf + msg_len, buffer_, cb_len);
-            udp_broadcast_to_known(send_buf, msg_len + cb_len);
-            // free(cb_buf);
+			if (cb_len <= 0)
+				continue;
+
+            udp_broadcast_to_known(cb_buffer_, cb_len);
 		}
 		sleep(1);
 	}
