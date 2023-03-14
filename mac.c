@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include <Carbon/Carbon.h>
 #include "udp_helper.h"
-#include "mac.h"
+#include "clipboard.h"
 #include "msg.h"
 
 /*
@@ -48,7 +48,7 @@ CFStringRef get_pasteboard_item_flavor(PasteboardItemID itemid)
 	return type;
 }
 
-char* read_local_clipboard(int *len)
+void read_local_clipboard(int *len)
 {
     OSStatus status;
 	PasteboardItemID itemid;
@@ -68,7 +68,7 @@ char* read_local_clipboard(int *len)
     {
         errno = status;
 		perror("PasteboardGetItemIdentifier(1) failed\n");
-		return NULL;
+		return;
 	}
 
 	CFStringRef type = get_pasteboard_item_flavor(itemid);
@@ -78,7 +78,7 @@ char* read_local_clipboard(int *len)
     {
         errno = status;
 		perror("PasteboardCopyItemFlavorData() failed\n");
-		return NULL;
+		return;
 	}
 
 	*len = CFDataGetLength(data);
@@ -86,8 +86,6 @@ char* read_local_clipboard(int *len)
 	memcpy(buf, CFDataGetBytePtr(data), *len);
 
 	CFRelease(data);
-
-	return buf;
 }
 
 void write_local_clipboard(char *buf, int len)
@@ -142,12 +140,12 @@ void clipboard_monitor_loop()
 		if (PasteboardSynchronize(clipboard) & kPasteboardModified)
 		{
 			int cb_len = 0;
-            char *cb_buf = read_local_clipboard(&cb_len);
+            read_local_clipboard(&cb_len);
             char send_buf[8192] = {0};
             int msg_len = gen_msg_clipboard_update(send_buf);
-            memcpy(send_buf + msg_len, cb_buf, cb_len);
+            memcpy(send_buf + msg_len, buffer_, cb_len);
             udp_broadcast_to_known(send_buf, msg_len + cb_len);
-            free(cb_buf);
+            // free(cb_buf);
 		}
 		sleep(1);
 	}
