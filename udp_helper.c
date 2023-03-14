@@ -19,7 +19,6 @@
 #include <ifaddrs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-// #include "linux.h"
 #elif __APPLE__
 #include <unistd.h>
 #include <pthread.h>
@@ -27,8 +26,10 @@
 #include <ifaddrs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-// #include "mac.h"
 #endif
+
+#define STREAM_TAG "STREAM_"
+#define STREAM_SLICE_LEN 1024
 
 int SERVER_PORT = 53338;
 
@@ -139,9 +140,23 @@ void udp_broadcast_to_known(char *buf, int len)
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 {
 	int ret, send_num = 0;
+	if (size > STREAM_SLICE_LEN) 
+	{
+		char tmp[64];
+		strcpy(tmp, STREAM_TAG); *((uint32_t *)(tmp + strlen(STREAM_TAG))) = size;
+		ret = sendto(udp_client_socket, tmp, sizeof(tmp), 0, (struct sockaddr *)&addr, sizeof(addr));
+		if (ret < 0)
+		{
+			remove_from_addr_list(addr);
+			perror("udp client send error:");
+			return ret;
+		}
+	}
+
 	while (send_num < size)
 	{
-		ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+		int tosend = size - send_num > STREAM_SLICE_LEN ? STREAM_SLICE_LEN : size - send_num;
+		ret = sendto(udp_client_socket, buffer + send_num, tosend, 0, (struct sockaddr *)&addr, sizeof(addr));
 		if (ret < 0)
 		{
 			remove_from_addr_list(addr);
@@ -243,6 +258,24 @@ void *server_loop()
 			}
 		}
 #endif
+
+		// start stream recv
+		if (strncmp(buffer_, STREAM_TAG, strlen(STREAM_TAG)) == 0)
+		{
+			uint32_t payload_len = (uint64_t)*(buffer_ + strlen(STREAM_TAG));
+			int off = 0;
+			while (off < payload_len)
+			{
+				int ret  = recvfrom(udp_server_socket, buffer_ + off, buffer_size - off, 0, (struct sockaddr*)&sendaddr, &len);
+				if(ret < 0)
+				{
+					perror("recvfrom error");
+					break;
+				}
+
+				off += ret;
+			}
+		}
 
 		handle_datagram(buffer_, ret, sendaddr);
 		memset(buffer_, 0, buffer_size);
