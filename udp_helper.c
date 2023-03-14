@@ -263,6 +263,9 @@ void *server_loop()
 		if (strncmp(buffer_, STREAM_TAG, strlen(STREAM_TAG)) == 0)
 		{
 			uint32_t payload_len = *((uint32_t *)(buffer_ + strlen(STREAM_TAG)));
+			if (payload_len > buffer_size)
+				goto out;
+				
 			int off = 0;
 			while (off < payload_len)
 			{
@@ -279,6 +282,7 @@ void *server_loop()
 		}
 
 		handle_datagram(buffer_, ret, sendaddr);
+out:
 		memset(buffer_, 0, buffer_size);
 	}
 
