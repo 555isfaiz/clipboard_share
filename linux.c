@@ -37,8 +37,14 @@ void read_fork(const char *command, char * const* arg, char *buffer, int len, in
     else
     {
         close(fds[1]);
-        if ((*len_out = read(fds[0], buffer, len)) <= 0)
+        int off = 0, nread;
+        while ((nread = read(fds[0], buffer + off, len - off)) > 0)
+            off += nread;
+        
+        if (nread < 0)
             perror("error reading from fork ");
+        
+        *len_out = off;
         close(fds[0]);
         waitpid(pid, &status, 0);
     }
