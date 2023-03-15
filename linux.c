@@ -85,7 +85,10 @@ void read_local_clipboard(int *len)
 
     const char* argument_list[] = {"xclip", "-selection", "clipboard", "-t", type, "-o", NULL};
     read_fork("xclip", argument_list, cb_buffer_ + msg_len, buffer_size - msg_len, len);
-    (*len) = (*len) + msg_len;
+    if (*len + msg_len <= buffer_size)
+        (*len) = (*len) + msg_len;
+    else
+        *len = 0;
 }
 
 void write_local_clipboard(char *buf, int len)
