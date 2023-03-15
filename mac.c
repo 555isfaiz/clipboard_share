@@ -94,8 +94,9 @@ void read_local_clipboard(int *len)
 	{
 		memcpy(cb_buffer_ + msg_len, CFDataGetBytePtr(data), *len);
 		*len += msg_len;
-		*len = 0;
 	}
+	else
+		*len = 0;
 
 	CFRelease(data);
 }
