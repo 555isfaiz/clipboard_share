@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include "msg.h"
-#include "udp_helper.h"
+#include "connection.h"
 #include "clipboard.h"
 
 #ifdef _WIN32

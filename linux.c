@@ -12,7 +12,7 @@
 #include <X11/extensions/Xfixes.h>
 #include "clipboard.h"
 #include "msg.h"
-#include "udp_helper.h"
+#include "connection.h"
 
 #define PLAINTEXT "UTF8_STRING"
 #define IMAGEPNG "image/png"

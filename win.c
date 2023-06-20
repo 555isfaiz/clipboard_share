@@ -1,7 +1,7 @@
 #include <Windows.h>
 #include <stdio.h>
 #include "win.h"
-#include "udp_helper.h"
+#include "connection.h"
 
 extern int is_gbk;
 int write_bit = 0;

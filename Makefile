@@ -12,8 +12,8 @@ UNAME_S := $(shell uname -s)
 		EXTRA_FLAGS += -framework CoreGraphics -framework CoreFoundation -framework ApplicationServices
     endif
 
-SOURCES = main.c  msg.c  udp_helper.c  $(PLATFORM_SOURCES)
-HEADERS = msg.h  udp_helper.h  clipboard.h
+SOURCES = main.c  msg.c  connection.c  $(PLATFORM_SOURCES)
+HEADERS = msg.h  connection.h  clipboard.h
 
 ifdef DEBUG
 CFLAGS = -g3 -ggdb3 -Wall -fsanitize=address -fstack-protector-all \
