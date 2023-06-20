@@ -173,7 +173,7 @@ void clipboard_monitor_loop()
             if (cb_len <= 0)
                 continue;
 
-            udp_broadcast_to_known(cb_buffer_, cb_len);
+            broadcast_to_known(cb_buffer_, cb_len);
         }
     }
 

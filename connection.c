@@ -32,6 +32,7 @@
 #define STREAM_SLICE_LEN 1024
 
 int SERVER_PORT = 53338;
+int STREAM_PORT = 53335;
 
 int udp_client_socket = 0;
 int udp_server_socket = 0;
@@ -127,45 +128,110 @@ void udp_broadcast()
 	ret = setsockopt(udp_client_socket, SOL_SOCKET, SO_BROADCAST, &off, sizeof(off));
 }
 
-void udp_broadcast_to_known(char *buf, int len)
+int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 {
-	for (int i = 0; i < addr_list_ptr; i++)
-	{
-		int ret = udp_send_as_client(addr_list[i], buf, len);
-		if (ret < 0)
-			break;		// error happened, this addr has been removed
-	}
-}
+	int sockfd, connfd, len, ret, send_num = 0;
+    struct sockaddr_in servaddr, cli;
 
-int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
-{
-	int ret, send_num = 0;
-	if (size > STREAM_SLICE_LEN) 
+    // socket create and verification
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) 
 	{
-		char tmp[64] = {0};
-		strcpy(tmp, STREAM_TAG); *((uint32_t *)(tmp + strlen(STREAM_TAG))) = size;
-		ret = sendto(udp_client_socket, tmp, sizeof(tmp), 0, (struct sockaddr *)&addr, sizeof(addr));
-		if (ret < 0)
-		{
-			remove_from_addr_list(addr);
-			perror("udp client send error:");
-			return ret;
-		}
+		perror("TCP socket create failed..");
+        return -1;
+	}
+
+    bzero(&servaddr, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(STREAM_PORT);
+
+    if ((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) != 0) 
+	{
+		perror("TCP bind failed...");
+		close(sockfd);
+        return -1;
+	}
+
+    if ((listen(sockfd, 5)) != 0) 
+	{
+		perror("TCP listen failed...");
+		close(sockfd);
+		return -1;
+	}
+
+    len = sizeof(cli);
+
+	char tmp[64] = {0};
+	strcpy(tmp, STREAM_TAG); *((uint32_t *)(tmp + strlen(STREAM_TAG))) = size;
+	ret = sendto(udp_client_socket, tmp, sizeof(tmp), 0, (struct sockaddr *)&addr, sizeof(addr));
+	if (ret < 0)
+	{
+		remove_from_addr_list(addr);
+		perror("udp client send error:");
+		close(sockfd);
+		return ret;
+	}
+
+    connfd = accept(sockfd, (struct sockaddr*)&cli, &len);
+    if (connfd < 0) 
+	{
+		perror("TCP accept failed...");
+		close(sockfd);
+		return -1;
 	}
 
 	while (send_num < size)
 	{
 		int tosend = size - send_num > STREAM_SLICE_LEN ? STREAM_SLICE_LEN : size - send_num;
-		ret = sendto(udp_client_socket, buffer + send_num, tosend, 0, (struct sockaddr *)&addr, sizeof(addr));
+		ret = write(connfd, buffer + send_num, tosend);
 		if (ret < 0)
 		{
 			remove_from_addr_list(addr);
+			perror("TCP send error:");
+			close(sockfd);
+			return ret;
+		}
+		send_num += ret; 
+	}
+
+    close(sockfd);
+	return 0;
+}
+
+int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
+{
+	int ret, send_num = 0;
+	while (send_num < size)
+	{
+		ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
+		if (ret < 0)
+		{
 			perror("udp client send error:");
 			return ret;
 		}
 		send_num += ret; 
 	}
 	return 0;
+}
+
+int send_payload(struct sockaddr_in addr, char *buffer, int size)
+{
+	if (size > STREAM_SLICE_LEN) 
+		return tcp_stream_send(addr, buffer, size);
+	else 
+		return udp_send_as_client(addr, buffer, size);
+}
+
+void broadcast_to_known(char *buf, int len)
+{
+	for (int i = 0; i < addr_list_ptr; i++)
+	{
+		int ret = send_payload(addr_list[i], buf, len);
+		if (ret < 0)
+			break;		// error happened, this addr has been removed
+	}
 }
 
 void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)

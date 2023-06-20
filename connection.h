@@ -12,7 +12,7 @@ int udp_init();
 
 void udp_broadcast();
 
-void udp_broadcast_to_known(char *buf, int len);
+void broadcast_to_known(char *buf, int len);
 
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size);
 
