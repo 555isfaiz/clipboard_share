@@ -164,7 +164,8 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
     len = sizeof(cli);
 
 	char tmp[64] = {0};
-	strcpy(tmp, STREAM_TAG); *((uint32_t *)(tmp + strlen(STREAM_TAG))) = size;
+	int ptr = gen_msg_stream(tmp);
+	*((uint32_t *)(tmp + ptr)) = size;
 	ret = sendto(udp_client_socket, tmp, sizeof(tmp), 0, (struct sockaddr *)&addr, sizeof(addr));
 	if (ret < 0)
 	{
@@ -198,6 +199,50 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 
     close(sockfd);
 	return 0;
+}
+
+int tcp_stream_recv(struct sockaddr_in from_addr, int size)
+{
+	int sockfd, recv_num, ret;
+    struct sockaddr_in servaddr;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) 
+	{
+        perror("TCP recv socket create failed...\n");
+		return -1;
+    }
+
+    bzero(&servaddr, sizeof(servaddr));
+
+    servaddr.sin_family = from_addr.sin_family;
+    servaddr.sin_addr = from_addr.sin_addr;
+    servaddr.sin_port = htons(STREAM_PORT);
+
+    if (connect(sockfd, (struct sockaddr_in*)&servaddr, sizeof(servaddr)) != 0) 
+	{
+        perror("TCP recv connect failed...\n");
+		close(sockfd);
+        return -1;
+    }
+
+	while (recv_num < size)
+	{
+		int torecv = size - recv_num > STREAM_SLICE_LEN ? STREAM_SLICE_LEN : size - recv_num;
+		ret = read(sockfd, buffer_ + recv_num, torecv);
+		if (ret < 0)
+		{
+			remove_from_addr_list(from_addr);
+			perror("TCP send error:");
+			close(sockfd);
+			return ret;
+		}
+		recv_num += ret; 
+	}
+
+	handle_datagram(buffer_, size, from_addr);
+
+    close(sockfd);
 }
 
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
@@ -263,6 +308,13 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
 	{
 		write_local_clipboard(buf + buf_len, len - buf_len);
 	}
+
+	// msg stream: set up a tcp stream connection for big payloads
+	buf_len = gen_msg_stream(buffer);
+	if (strncmp(buf, buffer, buf_len) == 0)
+	{
+		tcp_stream_recv(from_addr, *((uint32_t *)(buf + buf_len)));
+	}
 }
 
 void *server_loop()
@@ -324,29 +376,6 @@ void *server_loop()
 			}
 		}
 #endif
-
-		// start stream recv
-		if (strncmp(buffer_, STREAM_TAG, strlen(STREAM_TAG)) == 0)
-		{
-			uint32_t payload_len = *((uint32_t *)(buffer_ + strlen(STREAM_TAG)));
-			if (payload_len > buffer_size)
-				goto out;
-				
-			int off = 0;
-			while (off < payload_len)
-			{
-				int ret  = recvfrom(udp_server_socket, buffer_ + off, buffer_size - off, 0, (struct sockaddr*)&sendaddr, &len);
-				if(ret < 0)
-				{
-					perror("recvfrom error");
-					break;
-				}
-
-				off += ret;
-			}
-			ret = payload_len;
-		}
-
 		handle_datagram(buffer_, ret, sendaddr);
 out:
 		memset(buffer_, 0, buffer_size);

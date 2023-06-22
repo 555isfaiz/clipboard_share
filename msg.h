@@ -9,4 +9,6 @@ int gen_msg_ack_online(char *buf);
 
 int gen_msg_clipboard_update(char *buf);
 
+int gen_msg_stream(char *buf);
+
 #endif
