@@ -386,7 +386,6 @@ void *server_loop()
         }
 #endif
         handle_datagram(buffer_, ret, sendaddr);
-    out:
         memset(buffer_, 0, buffer_size);
     }
 
