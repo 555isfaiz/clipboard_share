@@ -83,16 +83,12 @@ int main(int argc, char *argv[])
     ret = udp_server_init();
     if (ret < 0)
         return ret;
-    info("ok");
 
     info("doing udp broadcast... ");
     udp_broadcast();
-    info("ok");
 
     info("init done...");
     info("start monitor...");
-
-    debug("verbose test");
 
     clipboard_monitor_loop();
     return 0;
