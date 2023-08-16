@@ -38,6 +38,8 @@ int STREAM_PORT = 53335;
 int udp_client_socket = 0;
 int udp_server_socket = 0;
 
+int tcp_server_socket = 0;
+
 struct sockaddr_in *addr_list;
 int addr_list_size = 8;
 int addr_list_ptr = 0;
@@ -132,37 +134,40 @@ void udp_broadcast()
 int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 {
     debug("stream sending to %s, buffer: %s\n", inet_ntoa(addr.sin_addr), buffer);
-    int sockfd, connfd, ret, send_num = 0, reuse = 1;
+    int connfd, ret, send_num = 0, reuse = 1;
     unsigned int len = 0;
     struct sockaddr_in servaddr, cli;
-
-    // socket create and verification
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1)
+    if (tcp_server_socket == 0)
     {
-        error("TCP socket create failed..\n");
-        return -1;
-    }
+        debug("creating a new stream server socket\n");
+        // socket create and verification
+        tcp_server_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (tcp_server_socket == -1)
+        {
+            error("TCP socket create failed..\n");
+            return -1;
+        }
 
-    bzero(&servaddr, sizeof(servaddr));
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int));
+        bzero(&servaddr, sizeof(servaddr));
+        setsockopt(tcp_server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int));
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(STREAM_PORT);
+        servaddr.sin_family = AF_INET;
+        servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        servaddr.sin_port = htons(STREAM_PORT);
 
-    if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
-    {
-        error("TCP bind failed: %s\n", strerror(errno));
-        close(sockfd);
-        return -1;
-    }
+        if ((bind(tcp_server_socket, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
+        {
+            error("TCP bind failed: %s\n", strerror(errno));
+            close(tcp_server_socket);
+            return -1;
+        }
 
-    if ((listen(sockfd, 5)) != 0)
-    {
-        error("TCP listen failed: %s\n", strerror(errno));
-        close(sockfd);
-        return -1;
+        if ((listen(tcp_server_socket, 5)) != 0)
+        {
+            error("TCP listen failed: %s\n", strerror(errno));
+            close(tcp_server_socket);
+            return -1;
+        }
     }
 
     len = sizeof(cli);
@@ -176,15 +181,15 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
     {
         remove_from_addr_list(addr);
         error("udp client send error: %s\n", strerror(errno));
-        close(sockfd);
+        close(tcp_server_socket);
         return ret;
     }
 
-    connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
+    connfd = accept(tcp_server_socket, (struct sockaddr *)&cli, &len);
     if (connfd < 0)
     {
         error("TCP accept failed: %s\n", strerror(errno));
-        close(sockfd);
+        close(tcp_server_socket);
         return -1;
     }
 
@@ -197,7 +202,7 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
             remove_from_addr_list(addr);
             error("TCP send error: %s\n", strerror(errno));
             close(connfd);
-            close(sockfd);
+            close(tcp_server_socket);
             return ret;
         }
         send_num += ret;
@@ -205,7 +210,6 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 
     debug("stream send finished, closing.. send num: %d\n", send_num);
     close(connfd);
-    close(sockfd);
     return 0;
 }
 
@@ -457,6 +461,7 @@ int udp_close()
 {
     close(udp_client_socket);
     close(udp_server_socket);
+    close(tcp_server_socket);
     free(buffer_);
     return 0;
 }
