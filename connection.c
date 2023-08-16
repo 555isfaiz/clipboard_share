@@ -95,7 +95,7 @@ int udp_init()
     udp_client_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (0 > udp_client_socket)
     {
-        perror("create client socket failed\n");
+        error("create client socket failed\n");
         return udp_client_socket;
     }
 
@@ -108,7 +108,7 @@ void udp_broadcast()
     int ret = setsockopt(udp_client_socket, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
     if (ret < 0)
     {
-        perror("setsockopt broadcast error");
+        error("setsockopt broadcast error\n");
         return;
     }
 
@@ -121,7 +121,7 @@ void udp_broadcast()
     ret = udp_send_as_client(addr, buf, len);
     if (ret < 0)
     {
-        perror("udp broadcast send error");
+        error("udp broadcast send error\n");
         return;
     }
 
@@ -131,7 +131,8 @@ void udp_broadcast()
 
 int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 {
-    int sockfd, connfd, ret, send_num = 0;
+    debug("stream sending to %s, buffer: %s\n", inet_ntoa(addr.sin_addr), buffer);
+    int sockfd, connfd, ret, send_num = 0, reuse = 1;
     unsigned int len = 0;
     struct sockaddr_in servaddr, cli;
 
@@ -139,11 +140,12 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
     {
-        perror("TCP socket create failed..");
+        error("TCP socket create failed..\n");
         return -1;
     }
 
     bzero(&servaddr, sizeof(servaddr));
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int));
 
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -151,20 +153,21 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
 
     if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
     {
-        perror("TCP bind failed...");
+        error("TCP bind failed: %s\n", strerror(errno));
         close(sockfd);
         return -1;
     }
 
     if ((listen(sockfd, 5)) != 0)
     {
-        perror("TCP listen failed...");
+        error("TCP listen failed: %s\n", strerror(errno));
         close(sockfd);
         return -1;
     }
 
     len = sizeof(cli);
 
+    debug("stream informing connection setup. size: %d\n", size);
     char tmp[64] = {0};
     int ptr = gen_msg_stream(tmp);
     *((uint32_t *)(tmp + ptr)) = size;
@@ -172,7 +175,7 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
     if (ret < 0)
     {
         remove_from_addr_list(addr);
-        perror("udp client send error:");
+        error("udp client send error: %s\n", strerror(errno));
         close(sockfd);
         return ret;
     }
@@ -180,7 +183,7 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
     connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
     if (connfd < 0)
     {
-        perror("TCP accept failed...");
+        error("TCP accept failed: %s\n", strerror(errno));
         close(sockfd);
         return -1;
     }
@@ -192,26 +195,30 @@ int tcp_stream_send(struct sockaddr_in addr, char *buffer, int size)
         if (ret < 0)
         {
             remove_from_addr_list(addr);
-            perror("TCP send error:");
+            error("TCP send error: %s\n", strerror(errno));
+            close(connfd);
             close(sockfd);
             return ret;
         }
         send_num += ret;
     }
 
+    debug("stream send finished, closing.. send num: %d\n", send_num);
+    close(connfd);
     close(sockfd);
     return 0;
 }
 
 int tcp_stream_recv(struct sockaddr_in from_addr, int size)
 {
-    int sockfd, recv_num, ret;
+    debug("start stream recv from %s, size: %d\n", inet_ntoa(from_addr.sin_addr), size);
+    int sockfd, recv_num = 0, ret;
     struct sockaddr_in servaddr;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
     {
-        perror("TCP recv socket create failed...\n");
+        error("TCP recv socket create failed: %s\n", strerror(errno));
         return -1;
     }
 
@@ -223,7 +230,7 @@ int tcp_stream_recv(struct sockaddr_in from_addr, int size)
 
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0)
     {
-        perror("TCP recv connect failed...\n");
+        error("TCP recv connect failed: %s\n", strerror(errno));
         close(sockfd);
         return -1;
     }
@@ -235,28 +242,31 @@ int tcp_stream_recv(struct sockaddr_in from_addr, int size)
         if (ret < 0)
         {
             remove_from_addr_list(from_addr);
-            perror("TCP recv error:");
+            error("TCP recv error: %s\n", strerror(errno));
             close(sockfd);
             return ret;
         }
         recv_num += ret;
     }
 
+    debug("stream recv finished. recv num: %d, buffer: %s\n", recv_num, buffer_);
     handle_datagram(buffer_, size, from_addr);
 
     close(sockfd);
+    debug("stream recv closed\n");
     return 0;
 }
 
 int udp_send_as_client(struct sockaddr_in addr, char *buffer, int size)
 {
+    debug("udp sending to %s, buffer: %s\n", inet_ntoa(addr.sin_addr), buffer);
     int ret, send_num = 0;
     while (send_num < size)
     {
         ret = sendto(udp_client_socket, buffer, size, 0, (struct sockaddr *)&addr, sizeof(addr));
         if (ret < 0)
         {
-            perror("udp client send error:");
+            error("udp client send error: %s\n", strerror(errno));
             return ret;
         }
         send_num += ret;
@@ -351,7 +361,7 @@ void *server_loop()
 
     if (getifaddrs(&ifaddr) == -1)
     {
-        perror("getifaddrs");
+        error("getifaddrs failed: %s\n", strerror(errno));
         return (void *)0;
     }
 #endif
@@ -362,7 +372,7 @@ void *server_loop()
         int ret = recvfrom(udp_server_socket, buffer_, buffer_size, 0, (struct sockaddr *)&sendaddr, &len);
         if (ret < 0)
         {
-            perror("recvfrom error");
+            error("recvfrom error: %s\n", strerror(errno));
             break;
         }
 #ifdef _WIN32
@@ -402,7 +412,7 @@ int udp_server_init()
     udp_server_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (0 > udp_server_socket)
     {
-        perror("create server socket failed\n");
+        error("create server socket failed: %s\n", strerror(errno));
         return udp_server_socket;
     }
 
@@ -414,7 +424,7 @@ int udp_server_init()
     int ret = bind(udp_server_socket, (struct sockaddr *)&addr_serv, sizeof(addr_serv));
     if (ret < 0)
     {
-        perror("bind error:");
+        error("bind error: %s\n", strerror(errno));
         return ret;
     }
 
@@ -428,7 +438,7 @@ int udp_server_init()
     err = pthread_create(&ntid, NULL, server_loop, NULL);
     if (err != 0)
     {
-        perror("can't create thread for udp server");
+        error("can't create thread for udp server: %s\n", strerror(errno));
         return err;
     }
 #endif
@@ -436,7 +446,7 @@ int udp_server_init()
     buffer_ = calloc(buffer_size, sizeof(char));
     if (!buffer_)
     {
-        perror("failed to create buffer:");
+        error("failed to create buffer: %s\n", strerror(errno));
         return -1;
     }
 

@@ -111,7 +111,10 @@ void read_local_clipboard(int *len)
     if (*len + msg_len <= buffer_size)
         (*len) = (*len) + msg_len;
     else
+    {
+        debug("content too big, ignoring. content length: %d, acceptable length: %d\n", *len, buffer_size - msg_len);
         *len = 0;
+    }
 }
 
 void write_local_clipboard(char *buf, int len)
