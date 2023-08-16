@@ -7,7 +7,10 @@ Clipboard Share is a cross platform clipboard sharing deamon. Clipboars Share da
 The current implementation of Clipboard Share is immature. Namely, the authentication and encryption is weak. It is recommended to use Clipboard Share in a trusted network environment. 
 
 ## Requirements on Linux
-Make sure you are using Xorg and have `xclip` installed.
+### X11
+Make sure you have `xclip` installed.
+### Wayland
+ClipboardShare uses x11 APIs for monitoring clipboard modification. Therefore, you need `XWayland`. Moreover, `wl-clipboard` is also needed for reading/writing clipboard.
 
 ## Usage
 
@@ -30,4 +33,6 @@ clipboardshare -h
 
 + Stronger encryption
 + Fix Windows version
-+ Wayland support
++ ~~Wayland support~~
++ ~~Use TCP to transmit large content instead of UDP~~
++ Get rid of Xwayland
