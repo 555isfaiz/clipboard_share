@@ -71,12 +71,12 @@ int main(int argc, char *argv[])
 
     if (!has_token)
     {
-        error("No token set...");
+        error("No token set...\n");
         print_usage(argv[0]);
         return 0;
     }
 
-    info("init udp server... ");
+    info("init udp server... \n");
     ret = udp_init();
     if (ret < 0)
         return ret;
@@ -84,11 +84,11 @@ int main(int argc, char *argv[])
     if (ret < 0)
         return ret;
 
-    info("doing udp broadcast... ");
+    info("doing udp broadcast... \n");
     udp_broadcast();
 
-    info("init done...");
-    info("start monitor...");
+    info("init done...\n");
+    info("start monitor...\n");
 
     clipboard_monitor_loop();
     return 0;

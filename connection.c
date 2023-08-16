@@ -235,7 +235,7 @@ int tcp_stream_recv(struct sockaddr_in from_addr, int size)
         if (ret < 0)
         {
             remove_from_addr_list(from_addr);
-            perror("TCP send error:");
+            perror("TCP recv error:");
             close(sockfd);
             return ret;
         }
@@ -290,9 +290,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
     int buf_len = gen_msg_online(buffer);
     if (strncmp(buf, buffer, len) == 0)
     {
-        char log[64] = {0};
-        sprintf(log, "new connection from %s", inet_ntoa(from_addr.sin_addr));
-        info(log);
+        info("new connection from %s\n", inet_ntoa(from_addr.sin_addr));
         from_addr.sin_port = htons(SERVER_PORT);
         add_to_addr_list(&from_addr);
         buf_len = gen_msg_ack_online(buffer);
@@ -304,9 +302,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
     buf_len = gen_msg_ack_online(buffer);
     if (strncmp(buf, buffer, len) == 0)
     {
-        char log[64] = {0};
-        sprintf(log, "ack online from %s", inet_ntoa(from_addr.sin_addr));
-        debug(log);
+        debug("ack online from %s\n", inet_ntoa(from_addr.sin_addr));
         add_to_addr_list(&from_addr);
         return;
     }
@@ -315,6 +311,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
     buf_len = gen_msg_clipboard_update(buffer);
     if (strncmp(buf, buffer, buf_len) == 0)
     {
+        debug("new clipboard content: %s\n", buf + buf_len);
         write_local_clipboard(buf + buf_len, len - buf_len);
     }
 
@@ -322,6 +319,7 @@ void handle_datagram(char *buf, int len, struct sockaddr_in from_addr)
     buf_len = gen_msg_stream(buffer);
     if (strncmp(buf, buffer, buf_len) == 0)
     {
+        debug("preparing tcp recv. len: %d\n", *((uint32_t *)(buf + buf_len)));
         tcp_stream_recv(from_addr, *((uint32_t *)(buf + buf_len)));
     }
 }

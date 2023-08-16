@@ -166,14 +166,7 @@ void write_local_clipboard(char *buf, int len)
 void clipboard_monitor_loop()
 {
     is_wayland = strcmp("wayland", getenv("XDG_SESSION_TYPE")) == 0;
-    if (is_wayland)
-    {
-        debug("current session type is wayland");
-    }
-    else
-    {
-        debug("current session type is x11");
-    }
+    debug("current session type is %s\n", getenv("XDG_SESSION_TYPE"));
 
     // The following code works on wayland if Xwayland is installed. Therefore...
     // TODO: do better

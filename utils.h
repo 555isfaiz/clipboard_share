@@ -7,7 +7,7 @@
 
 extern uint8_t is_verbose;
 
-#define info(msg)                                                                                                      \
+#define info(fmt, ...)                                                                                                 \
     {                                                                                                                  \
         char b[32];                                                                                                    \
         struct tm *sTm;                                                                                                \
@@ -16,10 +16,11 @@ extern uint8_t is_verbose;
         sTm = gmtime(&now);                                                                                            \
                                                                                                                        \
         strftime(b, sizeof(b), "[%Y-%m-%d %H:%M:%S]", sTm);                                                            \
-        fprintf(stdout, "%s[info][%s:%d]: %s\n", b, __FILE__, __LINE__, msg);                                          \
+        fprintf(stdout, "%s[info][%s:%d]: ", b, __FILE__, __LINE__);                                                   \
+        fprintf(stdout, fmt, ##__VA_ARGS__);                                                                           \
     }
 
-#define debug(msg)                                                                                                     \
+#define debug(fmt, ...)                                                                                                \
     {                                                                                                                  \
         if (is_verbose)                                                                                                \
         {                                                                                                              \
@@ -30,11 +31,12 @@ extern uint8_t is_verbose;
             sTm = gmtime(&now);                                                                                        \
                                                                                                                        \
             strftime(b, sizeof(b), "[%Y-%m-%d %H:%M:%S]", sTm);                                                        \
-            fprintf(stdout, "%s[debug][%s:%d]: %s\n", b, __FILE__, __LINE__, msg);                                     \
+            fprintf(stdout, "%s[debug][%s:%d]: ", b, __FILE__, __LINE__);                                              \
+            fprintf(stdout, fmt, ##__VA_ARGS__);                                                                       \
         }                                                                                                              \
     }
 
-#define error(msg)                                                                                                     \
+#define error(fmt, ...)                                                                                                \
     {                                                                                                                  \
         char b[32];                                                                                                    \
         struct tm *sTm;                                                                                                \
@@ -43,7 +45,8 @@ extern uint8_t is_verbose;
         sTm = gmtime(&now);                                                                                            \
                                                                                                                        \
         strftime(b, sizeof(b), "[%Y-%m-%d %H:%M:%S]", sTm);                                                            \
-        fprintf(stderr, "%s[error][%s:%d]: %s\n", b, __FILE__, __LINE__, msg);                                         \
+        fprintf(stderr, "%s[error][%s:%d]: ", b, __FILE__, __LINE__);                                                  \
+        fprintf(stderr, fmt, ##__VA_ARGS__);                                                                           \
     }
 
 #endif
