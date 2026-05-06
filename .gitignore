@@ -6,3 +6,7 @@ main
 clipboardshare
 nohup.out
 run_clipboard_share.sh
+
+# Added by cargo
+
+/target

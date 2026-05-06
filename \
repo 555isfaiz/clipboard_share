@@ -1,0 +1,29 @@
+use std::sync::{Mutex, OnceLock};
+
+use arboard::Clipboard;
+
+static CLIPBOARD: OnceLock<Mutex<Clipboard>> = OnceLock::new();
+
+fn clipboard() -> &'static Mutex<Clipboard> {
+    CLIPBOARD.get_or_init(|| {
+        Mutex::new(Clipboard::new().expect("failed to initialize system clipboard"))
+    })
+}
+
+pub fn read_text() -> Result<String, arboard::Error> {
+    CLIPBOARD.get().unwrap().lock().unwrap().get_text()
+}
+
+pub fn write_text(s: &str) -> Result<(), arboard::Error> {
+    clipboard().lock().unwrap().set_text(s.to_owned())
+}
+
+pub fn clipboard_init() {
+    {
+        let this = CLIPBOARD.set(Mutex::new( Clipboard::new().expect("failed to initialize system clipboard")));
+        match this {
+            Ok(t) => t,
+            Err(e) => unwrap_failed("failed to initialize system clipboard", &e),
+        }
+    };
+}
