@@ -7,6 +7,19 @@ use std::{
 
 static CLIPBOARD: OnceLock<Mutex<Clipboard>> = OnceLock::new();
 
+#[derive(Debug)]
+enum ClipboardContentType {
+    Text,
+    Image,
+    //...
+}
+
+#[derive(Debug)]
+pub struct ClipboardContent {
+    clipboard_type: ClipboardContentType,
+    bytes: Vec<u8>
+}
+
 struct ClipboardChangeHandler<F>
 where
     F: Fn(String) -> io::Result<()> + Send + 'static,

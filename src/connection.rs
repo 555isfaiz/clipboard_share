@@ -1,17 +1,21 @@
 use std::{
     io::{self},
-    net::{SocketAddr, SocketAddrV4},
-    sync::Arc,
+    net::{IpAddr, SocketAddr, SocketAddrV4},
+    sync::{Arc, Mutex},
 };
 
-use tokio::{net::UdpSocket, sync::Mutex};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream, UdpSocket},
+};
 
 use crate::clipboard::write_text;
-use crate::message::{parse, build, MessageType};
+use crate::message::{MessageType, build, parse};
 
 #[derive(Debug)]
 pub struct Connector {
     socket: Arc<UdpSocket>,
+    tcp_listener: Arc<TcpListener>,
     udp_port: u16,
     peer_addrs: Mutex<Vec<SocketAddrV4>>,
 }
@@ -19,8 +23,10 @@ pub struct Connector {
 impl Connector {
     pub async fn new(port: u16) -> io::Result<Self> {
         let socket = Arc::new(UdpSocket::bind(("0.0.0.0", port)).await?);
+        let listener = Arc::new(TcpListener::bind("0.0.0.0:0").await?);
         Ok(Self {
             socket,
+            tcp_listener: listener,
             udp_port: port,
             peer_addrs: Mutex::new(Vec::with_capacity(8)),
         })
@@ -37,32 +43,62 @@ impl Connector {
     }
 
     pub fn send_to_known(&self, payload: &[u8]) -> io::Result<()> {
-        if payload.len() >= 10240 {
-            self.send_via_tcp(payload);
-        } else {
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let peers = self.peer_addrs.lock().await;
-                    for peer in peers.iter() {
-                        if let Err(e) = self.socket.send_to(payload, peer).await {
-                            tracing::error!("send to {peer} failed: {e}");
-                        }
+        let peers = self.peer_addrs.lock().unwrap().clone();
+        let to_remove = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let mut to_remove = vec![];
+                for peer in &peers {
+                    if let Err(e) = if payload.len() >= 10240 {
+                        self.send_via_tcp(payload, peer).await
+                    } else {
+                        self.socket.send_to(payload, peer).await.map(|_| ())
+                    } {
+                        tracing::error!("send to {peer} failed: {e}");
+                        to_remove.push(*peer);
                     }
-                });
-            });
+                }
+                to_remove
+            })
+        });
+        if !to_remove.is_empty() {
+            let mut peers = self.peer_addrs.lock().unwrap();
+            peers.retain(|p| !to_remove.contains(p));
         }
         Ok(())
     }
 
-    pub fn send_via_tcp(&self, payload: &[u8]) {
-        todo!()
+    pub async fn send_via_tcp(&self, payload: &[u8], peer: &SocketAddrV4) -> io::Result<()> {
+        let mut buf = vec![0u8; 1024];
+        let port = self.tcp_listener.local_addr().unwrap().port().to_be_bytes();
+        build(MessageType::Stream, &mut buf);
+        buf.extend_from_slice(&port);
+
+        if let Err(e) = self.socket.send_to(&buf, peer).await {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                format!("send to {peer} failed when starting stream connection: {e}"),
+            ));
+        }
+
+        let (mut tcp_srteam, addr) = self.tcp_listener.accept().await.unwrap();
+        let addrv4: Option<SocketAddrV4> = match addr {
+            SocketAddr::V4(v4) => Some(v4),
+            SocketAddr::V6(_) => None,
+        };
+        if peer != &addrv4.unwrap() {
+            tracing::warn!("unknown peer {peer} established a TCP connection");
+            return Err(io::Error::new(
+                io::ErrorKind::NotConnected,
+                format!("unknown peer {peer} established a TCP connection"),
+            ));
+        }
+
+        tcp_srteam.write_all(payload).await?;
+        tcp_srteam.shutdown().await
     }
 }
 
-pub fn start_receiver(
-    buf_size: usize,
-    connector: &Arc<Connector>,
-) -> tokio::task::JoinHandle<()> {
+pub fn start_receiver(buf_size: usize, connector: &Arc<Connector>) -> tokio::task::JoinHandle<()> {
     let cloned_connector = Arc::clone(connector);
     tokio::spawn(async move {
         let mut buf = vec![0u8; buf_size];
@@ -71,13 +107,12 @@ pub fn start_receiver(
                 Ok((len, src)) => {
                     if src != cloned_connector.socket.peek_sender().await.unwrap() {
                         let packet = &mut buf[..len];
-                        handle_packet(packet, src, &cloned_connector)
-                            .await
-                            .unwrap();
+                        handle_packet(packet, src, &cloned_connector).await.unwrap();
                     }
                 }
                 Err(e) => {
                     tracing::error!("recv error: {e}");
+                    break;
                 }
             }
         }
@@ -101,7 +136,7 @@ pub async fn online_boardcast(connector: &Connector) -> io::Result<()> {
 async fn add_to_peer_list(src: std::net::SocketAddr, connector: &Connector) -> io::Result<()> {
     match src {
         SocketAddr::V4(v4) => {
-            connector.peer_addrs.lock().await.push(v4);
+            connector.peer_addrs.lock().unwrap().push(v4);
             tracing::info!("peer {src} added to list");
             Ok(())
         }
@@ -147,6 +182,15 @@ async fn handle_packet(
             Err(e) => tracing::error!("failed to parse clipboard update content: {e}"),
         },
         MessageType::Stream => {
+            // let port = u16::from_be_bytes(pkt[head_start..head_start + 2].try_into().unwrap());
+            // let addrv4: Option<SocketAddrV4> = match src {
+            //     SocketAddr::V4(v4) => Some(v4),
+            //     SocketAddr::V6(_) => None,
+            // };
+            // let tcp_stream = TcpStream::connect(SocketAddrV4::new(*addrv4.unwrap().ip(), port)).await?;
+            // let mut buf = vec![];
+            // tcp_stream.read_to_end(&mut buf);
+            // write_text()
             todo!()
         }
     };
