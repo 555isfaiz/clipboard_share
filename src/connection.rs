@@ -9,7 +9,7 @@ use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
 };
 
-use crate::clipboard::write_text;
+use crate::clipboard::{ClipboardContent, ClipboardContentType, write};
 use crate::message::{MessageType, build, parse};
 
 #[derive(Debug)]
@@ -171,16 +171,14 @@ async fn handle_packet(
                 tracing::error!("add to peer failed with {e}");
             }
         }
-        MessageType::ClipboardUpdate => match str::from_utf8(&pkt[head_start..]) {
-            Ok(content) => {
-                if let Err(e) = write_text(content) {
-                    tracing::error!(
-                        "failed to write clipboard update content: {content}, error: {e}"
-                    );
-                }
+        MessageType::ClipboardUpdate => {
+            if let Err(e) = write(ClipboardContent {
+                clipboard_type: ClipboardContentType::Text,
+                bytes: pkt[head_start..].to_vec(),
+            }) {
+                tracing::error!("failed to write clipboard update content, error: {e}");
             }
-            Err(e) => tracing::error!("failed to parse clipboard update content: {e}"),
-        },
+        }
         MessageType::Stream => {
             // let port = u16::from_be_bytes(pkt[head_start..head_start + 2].try_into().unwrap());
             // let addrv4: Option<SocketAddrV4> = match src {

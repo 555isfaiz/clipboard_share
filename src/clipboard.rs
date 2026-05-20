@@ -1,5 +1,6 @@
-use arboard::Clipboard;
+use arboard::{Clipboard, ImageData};
 use clipboard_master::{CallbackResult, ClipboardHandler, Master, Shutdown};
+use image::GenericImageView;
 use std::{
     io::{self},
     sync::{Mutex, OnceLock},
@@ -8,7 +9,7 @@ use std::{
 static CLIPBOARD: OnceLock<Mutex<Clipboard>> = OnceLock::new();
 
 #[derive(Debug)]
-enum ClipboardContentType {
+pub enum ClipboardContentType {
     Text,
     Image,
     //...
@@ -16,23 +17,23 @@ enum ClipboardContentType {
 
 #[derive(Debug)]
 pub struct ClipboardContent {
-    clipboard_type: ClipboardContentType,
-    bytes: Vec<u8>
+    pub clipboard_type: ClipboardContentType,
+    pub bytes: Vec<u8>,
 }
 
 struct ClipboardChangeHandler<F>
 where
-    F: Fn(String) -> io::Result<()> + Send + 'static,
+    F: Fn(ClipboardContent) -> io::Result<()> + Send + 'static,
 {
     clipboard_broadcaster: F,
 }
 
 impl<F> ClipboardHandler for ClipboardChangeHandler<F>
 where
-    F: Fn(String) -> io::Result<()> + Send + 'static,
+    F: Fn(ClipboardContent) -> io::Result<()> + Send + 'static,
 {
     fn on_clipboard_change(&mut self) -> CallbackResult {
-        if let Ok(text) = read_text() {
+        if let Ok(text) = read() {
             (self.clipboard_broadcaster)(text).unwrap();
         }
         CallbackResult::Next
@@ -46,7 +47,7 @@ where
 
 pub fn spawn_listener<F>(f: F) -> Shutdown
 where
-    F: Fn(String) -> io::Result<()> + Send + 'static,
+    F: Fn(ClipboardContent) -> io::Result<()> + Send + 'static,
 {
     let mut master = Master::new(ClipboardChangeHandler {
         clipboard_broadcaster: f,
@@ -63,11 +64,46 @@ fn clipboard() -> &'static Mutex<Clipboard> {
     })
 }
 
-pub fn read_text() -> Result<String, arboard::Error> {
-    clipboard().lock().unwrap().get_text()
+pub fn read() -> Result<ClipboardContent, arboard::Error> {
+    let mut cb = clipboard().lock().unwrap();
+    if let Ok(text_content) = cb.get_text() {
+        Ok(ClipboardContent {
+            clipboard_type: ClipboardContentType::Text,
+            bytes: text_content.into_bytes(),
+        })
+    } else if let Ok(image_content) = cb.get_image() {
+        Ok(ClipboardContent {
+            clipboard_type: ClipboardContentType::Image,
+            bytes: image_content.bytes.into_owned(),
+        })
+    } else {
+        Err(arboard::Error::ContentNotAvailable)
+    }
 }
 
-pub fn write_text(s: &str) -> Result<(), arboard::Error> {
-    tracing::info!("writing {s} into local clipboard");
-    clipboard().lock().unwrap().set_text(s.to_owned())
+pub fn write(clipboard_content: ClipboardContent) -> Result<(), arboard::Error> {
+    let mut cb = clipboard().lock().unwrap();
+    match clipboard_content {
+        ClipboardContent {
+            clipboard_type: ClipboardContentType::Text,
+            bytes,
+        } => {
+            let text = String::from_utf8(bytes)
+                .map_err(|_| arboard::Error::ConversionFailure)?;
+            cb.set_text(text)
+        }
+        ClipboardContent {
+            clipboard_type: ClipboardContentType::Image,
+            bytes,
+        } => {
+            let img = image::load_from_memory(&bytes).unwrap();
+            let (w, h) = img.dimensions();
+            let image = ImageData {
+                width: w as usize,
+                height: h as usize,
+                bytes: bytes.into(),
+            };
+            cb.set_image(image)
+        },
+    }
 }

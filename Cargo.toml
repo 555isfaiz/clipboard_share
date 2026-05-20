@@ -10,3 +10,4 @@ tracing             = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 arboard = { version = "3", features = ["wayland-data-control"] }
 clipboard-master = "4"
+image = "0.25.8"

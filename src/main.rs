@@ -50,10 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let udp_receiver_joinable = start_receiver(args.buffer_size, &connector);
 
     info!("starting clipboard monitor loop...");
-    let shundown = clipboard::spawn_listener(move |str| {
+    let shundown = clipboard::spawn_listener(move |cb_content| {
         let mut buffer: Vec<u8> = Vec::with_capacity(args.buffer_size);
         let _ = build(MessageType::ClipboardUpdate, &mut buffer);
-        buffer.extend_from_slice(str.as_bytes());
+        buffer.extend_from_slice(&cb_content.bytes);
         connector.send_to_known(&buffer)
     });
 
